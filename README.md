@@ -1,5 +1,7 @@
 # Godot Aseprite
 
+<p align="center"><img src="ase256.png" alt="Aseprite Logo"/></p>
+
 Aseprite file parser for Godot Engine.
 
 ## ERR_FILE_CORRUPT
