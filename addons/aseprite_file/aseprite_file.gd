@@ -101,11 +101,13 @@ var num_colors: int = 0
 ## Pixel width (pixel ratio is "pixel width/pixel height").
 ## If this or pixel height field is zero, pixel ratio is 1:1
 var pixel_width: int = 0
+
 ## Pixel height
 var pixel_height: int = 0
 
 ## X position of the grid
 var grid_x: int = 0
+
 ## Y position of the grid
 var grid_y: int = 0
 
@@ -116,9 +118,16 @@ var grid_width: int = 0
 ## Grid height (zero if there is no grid)
 var grid_height: int = 0
 
+## The palette used in the sprite.
 var palette: Palette = Palette.new()
+
+## Frames in the sprite.
 var frames: Array[Frame] = []
+
+## Layers in the sprite.
 var layers: Array[Layer] = []
+
+## A tileset is a collection of individual tiles, arranged in a grid.
 var tilesets: Array[Tileset] = []
 
 var __consumed: bool = false
@@ -467,6 +476,252 @@ func open(path: String) -> int:
 func close() -> void:
 	pass
 
+## Determines if the layer frame is empty.
+## A layer frame is considered empty if it has no cel for that specified frame.
+##
+## Note: This method does not check for layer opacity, visibility, nor does it check for the size of the cel, nor if the cel is fully transparent.
+## It only counts the number of cels in the frame which belong to the layer.
+func is_layer_frame_empty(layer_index: int, frame_index: int) -> bool:
+	# Count the number of cels in the frame which belong to the layer
+	return self.frames[frame_index].cels.reduce(func(count: int, cel: AsepriteFile.Cel):
+		return count + 1 if cel.layer_index == layer_index else count, 0
+	) == 0
+
+## Extract the image for the specified layer and frame.
+##
+## Note: The image format is RGBA8 regardless of the original color depth.
+func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
+	var cels: Array[Cel] = self.frames[frame_index].cels.filter(func(cel: AsepriteFile.Cel): return cel.layer_index == layer_index)
+
+	# `sort_custom` sorts in place, we have used `filter` above which returns a new array so it's fine
+	cels.sort_custom(func(a: AsepriteFile.Cel, b: AsepriteFile.Cel):
+		var orderA := a.layer_index + a.z_index
+		var orderB := b.layer_index + b.z_index
+		return orderA - orderB || a.z_index - b.z_index
+	)
+
+	# TODO: print a warn, or assert
+	if cels.size() == 0:
+		return null
+
+	var canvas := Image.create_empty(
+		self.width,
+		self.height,
+		false,
+		Image.FORMAT_RGBA8
+	)
+
+	for cel_index in range(cels.size()):
+		var cel := cels[cel_index]
+		var img := get_frame_cel_image(frame_index, cel_index)
+
+		canvas.blit_rect(
+			img,
+			Rect2i(0, 0, img.get_width(), img.get_height()),
+			Vector2i(cel.x, cel.y)
+		)
+
+	return canvas
+
+## Extract the image for the specified cel in the specified frame.
+##
+## Note: The image format is RGBA8 regardless of the original color depth.
+func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
+	# Let Godot to throw "index out of bounds" error if any of the indexes are invalid
+	var cel := self.frames[frame_index].cels[cel_index]
+
+	# Special case for tilemap cels
+	if cel.type == 3:
+		assert(cel.bits_per_tile == 32, "Aseprite - Unsupported bits per tile: %d" % cel.bits_per_tile)
+
+		var layer := self.layers[cel.layer_index]
+
+		assert(layer.type == LAYER_TYPE_TILEMAP, "Aseprite - Cel layer is not a tilemap layer")
+
+		var tileset := self.tilesets[layer.tileset_index]
+
+		var canvas := Image.create_empty(
+			cel.w * tileset.tile_width,
+			cel.h * tileset.tile_height,
+			false,
+			Image.FORMAT_RGBA8
+		)
+
+		# Assert the cel.buffer.size() is precise multiple of 4 (cel.bits_per_tile / 8)
+		assert(cel.buffer.size() % (cel.bits_per_tile / 8) == 0, "Aseprite - Cel buffer size is not a multiple of %d: %d" % [(cel.bits_per_tile / 8), cel.buffer.size()])
+
+		# TODO: does godot support buffer-reader of some sort?
+		for i in range(cel.buffer.size() / 4):
+			var x1 := cel.buffer[i * 4 + 0]
+			var x2 := cel.buffer[i * 4 + 1]
+			var x3 := cel.buffer[i * 4 + 2]
+			var x4 := cel.buffer[i * 4 + 3]
+
+			# Expand little endian DWORD
+			var dword := (x4 << 24) | (x3 << 16) | (x2 << 8) | x1
+
+			var tile_id := dword & cel.bitmask_for_tile_id
+			var x_flip := (dword & cel.bitmask_for_x_flip) != 0
+			var y_flip := (dword & cel.bitmask_for_y_flip) != 0
+			var rotation := (dword & cel.bitmask_for_90cw_rotation) != 0
+
+			var img := tileset.get_tile_image(tile_id)
+
+			# TODO: account for x_flip, y_flip and rotation!
+			# Only if the layer is a tilemap layer those bits are be 0!
+			canvas.blit_rect(
+				img,
+				Rect2i(0, 0, img.get_width(), img.get_height()),
+				Vector2i(
+					# Cel is arranged like an image, it has a stride and height
+					(i % cel.w) * tileset.tile_width,
+					(i / cel.w) * tileset.tile_height
+				),
+			)
+
+		return canvas
+
+	# Godot expands 8-bit indexed images to 32-bit RGBA8
+	if self.color_depth == 8:
+		var rgba8_buf := PackedByteArray()
+		rgba8_buf.resize(cel.w * cel.h * 4)
+
+		for i in range(cel.buffer.size()):
+			var color_index := cel.buffer[i]
+
+			# TODO: handle palette index out of bounds
+			var color := self.palette.colors[color_index]
+
+			rgba8_buf[i * 4 + 0] = color.red
+			rgba8_buf[i * 4 + 1] = color.green
+			rgba8_buf[i * 4 + 2] = color.blue
+			rgba8_buf[i * 4 + 3] = color.alpha
+
+		return Image.create_from_data(
+			cel.w,
+			cel.h,
+			false,
+			Image.FORMAT_RGBA8,
+			rgba8_buf,
+		)
+
+	if self.color_depth == 16:
+		var img := Image.create_from_data(
+			cel.w,
+			cel.h,
+			false,
+			Image.FORMAT_LA8,
+			cel.buffer,
+		)
+
+		# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
+		# In grayscale, RGB channels are all set to the same value
+		# R = BYTE[0]
+		# G = BYTE[0]
+		# B = BYTE[0]
+		# A = BYTE[1]
+		img.convert(Image.FORMAT_RGBA8)
+
+		return img
+
+	return Image.create_from_data(
+		cel.w,
+		cel.h,
+		false,
+		Image.FORMAT_RGBA8,
+		cel.buffer,
+	)
+
+## Return the image in the `Image.FORMAT_RGBA8` format.
+static func create_image_from_data(width: int, height: int, color_depth: int, palette: Palette, data: PackedByteArray) -> Image:
+	# Assert the buffer size
+	assert(data.size() == width * height * (color_depth / 8), "Aseprite - Image buffer size mismatch: expected %d, got %d" % [width * height * (color_depth / 8), data.size()])
+
+	# Godot expands 8-bit indexed images to 32-bit RGBA8
+	if color_depth == 8:
+		assert(palette, "Aseprite - No palette set for the image")
+
+		# TODO: is there a way to create a PackedByteArray with a specific size?
+		var buffer := PackedByteArray()
+		buffer.resize(width * height * 4)
+
+		for i in range(data.size()):
+			var color_index := data[i]
+
+			# TODO: handle palette index out of bounds
+			var color := palette.colors[color_index]
+
+			buffer[i * 4 + 0] = color.red
+			buffer[i * 4 + 1] = color.green
+			buffer[i * 4 + 2] = color.blue
+			buffer[i * 4 + 3] = color.alpha
+
+		return Image.create_from_data(
+			width,
+			height,
+			false,
+			Image.FORMAT_RGBA8,
+			buffer,
+		)
+
+	if color_depth == 16:
+		var img := Image.create_from_data(
+			width,
+			height,
+			false,
+			Image.FORMAT_LA8,
+			data,
+		)
+
+		# Godot correctly convert 16-bit grayscale images to 32-bit RGBA8 images
+		# In grayscale, RGB channels are all set to the same value
+		# R = BYTE[0]
+		# G = BYTE[0]
+		# B = BYTE[0]
+		# A = BYTE[1]
+		img.convert(Image.FORMAT_RGBA8)
+
+		return img
+
+	assert(color_depth == 32, "Aseprite - Unsupported color depth: %d" % color_depth)
+
+	return Image.create_from_data(
+		width,
+		height,
+		false,
+		Image.FORMAT_RGBA8,
+		data,
+	)
+
+## Get a raw image from the buffer.
+## For 8-bit: `Image.FORMAT_R8`, the palette indes is stored in the RED channel.
+## For 16-bit: `Image.FORMAT_LA8`, Luminance store the RGB channels, R=G=B = Luminance
+## For 32-bit: `Image.FORMAT_RGBA8`, 8 bits per channel, RGBA order.
+static func create_raw_image_from_data(width: int, height: int, color_depth: int, data: PackedByteArray) -> Image:
+	# Assert color depth
+	assert(color_depth in [8, 16, 32], "Aseprite - Unsupported color depth: %d" % color_depth)
+
+	# Assert buffer size
+	assert(data.size() == width * height * (color_depth / 8), "Aseprite - Image buffer size mismatch: expected %d, got %d" % [width * height * (color_depth / 8), data.size()])
+
+	var format := Image.FORMAT_RGBA8
+
+	match color_depth:
+		8:
+			format = Image.FORMAT_R8
+		16:
+			format = Image.FORMAT_LA8
+		_:
+			format = Image.FORMAT_RGBA8
+
+	return Image.create_from_data(
+		width,
+		height,
+		false,
+		format,
+		data,
+	)
+
 class Frame extends RefCounted:
 	var _ase: WeakRef
 
@@ -493,9 +748,9 @@ class Frame extends RefCounted:
 
 	var cels: Array[Cel] = []
 
-	func get_chunks_count() -> int:
-		# Per spec, use old chunks count if new chunks count is zero
-		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
+	# func get_chunks_count() -> int:
+	# 	# Per spec, use old chunks count if new chunks count is zero
+	# 	return chunks_num_old if chunks_num_new == 0 else chunks_num_new
 
 	func get_image(layer_index: int) -> Image:
 		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
@@ -929,3 +1184,72 @@ class Tileset extends RefCounted:
 			Image.FORMAT_RGBA8,
 			buf,
 		)
+
+# FileAccess does not extend StreamPeer...
+class _BinaryReader extends RefCounted:
+	var stream: Variant
+
+	func open(data: Variant):
+		if data is FileAccess:
+			data.big_endian = false
+			self.stream = data
+
+		elif data is StreamPeerBuffer:
+			data.big_endian = false
+			self.stream = data
+
+		elif data is PackedByteArray:
+			var buffer := StreamPeerBuffer.new()
+			buffer.data_array = data
+			buffer.big_endian = false
+			self.stream = buffer
+
+	func get_length() -> int:
+		if stream is FileAccess: return stream.get_length()
+		if stream is StreamPeerBuffer: return stream.get_size()
+		return -1
+
+	func get_position() -> int:
+		if stream is FileAccess: return stream.get_position()
+		if stream is StreamPeerBuffer: return stream.get_position()
+		return -1
+
+	func seek(position: int) -> void:
+		if stream is FileAccess: stream.seek(position)
+		if stream is StreamPeerBuffer: stream.seek(position)
+
+	func get_byte() -> int:
+		if stream is FileAccess: return stream.get_8()
+		if stream is StreamPeerBuffer: return stream.get_8()
+		return -1
+
+	func get_word() -> int:
+		if stream is FileAccess: return stream.get_16()
+		if stream is StreamPeerBuffer: return stream.get_16()
+		return -1
+
+	func get_short() -> int:
+		if stream is FileAccess: return stream.get_16()
+		if stream is StreamPeerBuffer: return stream.get_16()
+		return -1
+
+	func get_dword() -> int:
+		if stream is FileAccess: return stream.get_32()
+		if stream is StreamPeerBuffer: return stream.get_32()
+		return -1
+
+	func get_long() -> int:
+		if stream is FileAccess: return stream.get_32()
+		if stream is StreamPeerBuffer: return stream.get_32()
+		return -1
+
+	func get_string() -> String:
+		if stream is FileAccess: return stream.get_buffer(stream.get_16()).get_string_from_utf8()
+
+		if stream is StreamPeerBuffer:
+			var pos: int = stream.get_position()
+			var buf: PackedByteArray = stream.data_array
+			var string_len: int = stream.get_16()
+			return buf.slice(pos, pos + string_len).get_string_from_utf8()
+
+		return ""
