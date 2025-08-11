@@ -60,7 +60,43 @@
 class_name AsepriteFile extends RefCounted
 
 const PALETTE_COLOR_FLAG_HAS_NAME: int = 1
-const LAYER_TYPE_TILEMAP = 2
+
+const LAYER_FLAG_VISIBLE: int = 1
+const LAYER_FLAG_EDITABLE: int = 2
+const LAYER_FLAG_LOCK_MOVEMENT: int = 4
+const LAYER_FLAG_BACKGROUND: int = 8
+const LAYER_FLAG_PREFER_LINKED_CEL: int = 16
+const LAYER_FLAG_GROUP_COLLAPSED: int = 32
+const LAYER_FLAG_REFERENCE_LAYER: int = 64
+
+const LAYER_TYPE_NORMAL: int = 0
+const LAYER_TYPE_GROUP: int = 1
+const LAYER_TYPE_TILEMAP: int = 2
+
+const LAYER_BLEND_NORMAL: int = 0
+const LAYER_BLEND_MULTIPLY: int = 1
+const LAYER_BLEND_SCREEN: int = 2
+const LAYER_BLEND_OVERLAY: int = 3
+const LAYER_BLEND_DARKEN: int = 4
+const LAYER_BLEND_LIGHTEN: int = 5
+const LAYER_BLEND_COLOR_DODGE: int = 6
+const LAYER_BLEND_COLOR_BURN: int = 7
+const LAYER_BLEND_HARD_LIGHT: int = 8
+const LAYER_BLEND_SOFT_LIGHT: int = 9
+const LAYER_BLEND_DIFFERENCE: int = 10
+const LAYER_BLEND_EXCLUSION: int = 11
+const LAYER_BLEND_HUE: int = 12
+const LAYER_BLEND_SATURATION: int = 13
+const LAYER_BLEND_COLOR: int = 14
+const LAYER_BLEND_LUMINOSITY: int = 15
+const LAYER_BLEND_ADDITION: int = 16
+const LAYER_BLEND_SUBTRACT: int = 17
+const LAYER_BLEND_DIVIDE: int = 18
+
+const CEL_TYPE_IMAGE: int = 0
+const CEL_TYPE_LINKED: int = 1
+const CEL_TYPE_COMPRESSED_CEL: int = 2
+const CEL_TYPE_COMPRESSED_TILEMAP: int = 3
 
 ## Size of the file in bytes
 var file_size: int = -1
@@ -905,6 +941,12 @@ class Layer extends RefCounted:
 	var tileset_index: int = -1
 	var uuid: String = ""
 
+	func is_visible() -> bool:
+		return (self.flags & 1) != 0
+
+	func is_hidden() -> bool:
+		return not self.is_visible()
+
 ## 0x2005
 class Cel extends RefCounted:
 	var _ase: WeakRef
@@ -1057,7 +1099,20 @@ class Tileset extends RefCounted:
 	var _chunk_index: int = -1
 
 	var id: int = 0
+
+	#   1 - Include link to external file
+	#   2 - Include tiles inside this file
+	#   4 - Tilemaps using this tileset use tile ID=0 as empty tile
+	#       (this is the new format). In rare cases this bit is off,
+	#       and the empty tile will be equal to 0xffffffff (used in
+	#       internal versions of Aseprite)
+	#   8 - Aseprite will try to match modified tiles with their X
+	#       flipped version automatically in Auto mode when using
+	#       this tileset.
+	#   16 - Same for Y flips
+	#   32 - Same for D(iagonal) flips
 	var flags: int = 0
+
 	var tiles_count: int = 0
 	var tile_width: int = 0
 	var tile_height: int = 0
