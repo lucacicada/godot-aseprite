@@ -4,16 +4,21 @@
 
 Aseprite file parser for Godot Engine.
 
+# Script
+
+The script is in a single GDScript file [addons/aseprite_file/aseprite_file.gd](addons/aseprite_file/aseprite_file.gd)
+
+You can use it as a plugin or copy the file in your project.
+
 ## ERR_FILE_CORRUPT
 
 The parser perform several strict checks to ensure the file is valid.
 At the moment, it return a generic `ERR_FILE_CORRUPT` error if the file is malformed.
-
 In the future, a warning message will be printed.
 
 ## Security note
 
-This parser is vulnerable to gzip bombs as`decompress_dynamic` calls are unbounded (`-1`).
+This parser is vulnerable to gzip bombs as `decompress_dynamic` calls are unbounded (`-1`).
 
 The compression format used by Aseprite is ZLIB; it does not store the uncompressed size of the deflated buffer. Without this information, it is not possible to know at runtime how large the uncompressed buffer will be.
 
