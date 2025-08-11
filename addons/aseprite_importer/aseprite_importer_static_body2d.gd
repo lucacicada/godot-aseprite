@@ -49,7 +49,7 @@ func _get_priority() -> float:
 	return 1.0
 
 func _get_import_order() -> int:
-	return 0
+	return IMPORT_ORDER_DEFAULT + 2
 
 func _get_preset_count() -> int:
 	return presets.size()

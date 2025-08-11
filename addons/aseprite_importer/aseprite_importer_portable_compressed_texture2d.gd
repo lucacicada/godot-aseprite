@@ -10,19 +10,19 @@ var presets := [
 ]
 
 func _get_importer_name() -> String:
-	return "aseprite.importer.image_texture"
+	return "aseprite.importer.portable_compressed_texture2d"
 
 func _get_visible_name() -> String:
-	return "ImageTexture (Aseprite)"
+	return "PortableCompressedTexture2D (Aseprite)"
 
 func _get_recognized_extensions() -> PackedStringArray:
 	return ["aseprite", "ase"]
 
 func _get_resource_type() -> String:
-	return "ImageTexture"
+	return "PortableCompressedTexture2D"
 
 func _get_save_extension() -> String:
-	return "tres"
+	return "res"
 
 func _get_priority() -> float:
 	return 1.0
@@ -49,6 +49,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	var ase_file := AsepriteFile.new()
 
 	err = ase_file.open(source_file)
+
 	if err != OK:
 		push_warning("Aseprite - Failed to open file: %s" % error_string(err))
 		return err
@@ -83,22 +84,13 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		return FAILED
 
 	var layer_image := ase_file.get_layer_frame_image(layer_index, 0)
+	var texture := PortableCompressedTexture2D.new()
+	texture.create_from_image(layer_image, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
 
-	var export_filepath := save_path + ".exported.png"
-
-	err = layer_image.save_png(export_filepath)
-
-	if err != OK:
-		push_error("Aseprite - Failed to save image: %s" % error_string(err))
-		return err
-
-	gen_files.append(export_filepath)
-	append_import_external_resource(export_filepath)
-
-	err = ResourceSaver.save(ResourceLoader.load(export_filepath), save_path + "." + _get_save_extension())
+	err = ResourceSaver.save(texture, save_path + "." + _get_save_extension())
 
 	if err != OK:
 		push_warning("Aseprite - Failed to save resource: %s" % error_string(err))
 		return err
 
-	return OK
+	return err
