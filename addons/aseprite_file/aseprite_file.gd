@@ -518,16 +518,17 @@ func close() -> void:
 ## Note: This method does not check for layer opacity, visibility, nor does it check for the size of the cel, nor if the cel is fully transparent.
 ## It only counts the number of cels in the frame which belong to the layer.
 func is_layer_frame_empty(layer_index: int, frame_index: int) -> bool:
-	# Count the number of cels in the frame which belong to the layer
-	return self.frames[frame_index].cels.reduce(func(count: int, cel: AsepriteFile.Cel):
-		return count + 1 if cel.layer_index == layer_index else count, 0
-	) == 0
+	return not self.frames[frame_index].cels.any(func(cel: AsepriteFile.Cel):
+		return cel.layer_index == layer_index
+	)
 
 ## Extract the image for the specified layer and frame.
 ##
 ## Note: The image format is RGBA8 regardless of the original color depth.
 func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
-	var cels: Array[Cel] = self.frames[frame_index].cels.filter(func(cel: AsepriteFile.Cel): return cel.layer_index == layer_index)
+	var cels: Array[Cel] = self.frames[frame_index].cels.filter(func(cel: AsepriteFile.Cel):
+		return cel.layer_index == layer_index
+	)
 
 	# `sort_custom` sorts in place, we have used `filter` above which returns a new array so it's fine
 	cels.sort_custom(func(a: AsepriteFile.Cel, b: AsepriteFile.Cel):
@@ -536,9 +537,9 @@ func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
 		return orderA - orderB || a.z_index - b.z_index
 	)
 
-	# TODO: print a warn, or assert
-	if cels.size() == 0:
-		return null
+	# Just print an empty image if there are no cels
+	# Use is_layer_frame_empty to check if the layer frame is empty
+	# if cels.size() == 0: return null
 
 	var canvas := Image.create_empty(
 		self.width,
