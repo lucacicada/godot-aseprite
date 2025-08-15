@@ -1354,6 +1354,10 @@ class _BinaryReader extends RefCounted:
 			buffer.big_endian = false
 			self.stream = buffer
 
+	func close() -> void:
+		if stream is FileAccess: stream.close()
+		stream = null
+
 	func get_length() -> int:
 		if stream is FileAccess: return stream.get_length()
 		if stream is StreamPeerBuffer: return stream.get_size()
@@ -1366,31 +1370,66 @@ class _BinaryReader extends RefCounted:
 
 	func seek(position: int) -> void:
 		if stream is FileAccess: stream.seek(position)
-		if stream is StreamPeerBuffer: stream.seek(position)
+		elif stream is StreamPeerBuffer: stream.seek(position)
 
+	## An 8-bit unsigned integer value
 	func get_byte() -> int:
 		if stream is FileAccess: return stream.get_8()
 		if stream is StreamPeerBuffer: return stream.get_8()
 		return -1
 
+	## A 16-bit unsigned integer value
 	func get_word() -> int:
 		if stream is FileAccess: return stream.get_16()
 		if stream is StreamPeerBuffer: return stream.get_16()
 		return -1
 
-	func get_short() -> int:
-		if stream is FileAccess: return stream.get_16()
-		if stream is StreamPeerBuffer: return stream.get_16()
-		return -1
-
+	## A 32-bit unsigned integer value
 	func get_dword() -> int:
 		if stream is FileAccess: return stream.get_32()
 		if stream is StreamPeerBuffer: return stream.get_32()
 		return -1
 
+	## A 16-bit signed integer value
+	func get_short() -> int:
+		if stream is FileAccess: return stream.get_16()
+		if stream is StreamPeerBuffer: return stream.get_16()
+		return -1
+
+	## A 32-bit signed integer value
 	func get_long() -> int:
 		if stream is FileAccess: return stream.get_32()
 		if stream is StreamPeerBuffer: return stream.get_32()
+		return -1
+
+	## A 32-bit fixed point (16.16) value
+	func get_fixed() -> float:
+		if stream is FileAccess: return stream.get_32() << 16
+		if stream is StreamPeerBuffer: return stream.get_32() << 16
+		return 0.0
+
+	## A 32-bit single-precision value
+	func get_float() -> float:
+		if stream is FileAccess: return stream.get_float()
+		if stream is StreamPeerBuffer: return stream.get_float()
+		return 0.0
+
+	## A 64-bit double-precision value
+	func get_double() -> float:
+		if stream is FileAccess: return stream.get_double()
+		if stream is StreamPeerBuffer: return stream.get_double()
+		return 0.0
+
+	## A 64-bit unsigned integer value
+	func get_qword() -> int:
+		if stream is FileAccess: return stream.get_64()
+		if stream is StreamPeerBuffer: return stream.get_64()
+		return -1
+
+	## A 64-bit signed integer value
+	func get_long64() -> int:
+		if stream is FileAccess: return stream.get_64()
+		if stream is StreamPeerBuffer: return stream.get_64()
 		return -1
 
 	func get_string() -> String:
@@ -1403,3 +1442,55 @@ class _BinaryReader extends RefCounted:
 			return buf.slice(pos, pos + string_len).get_string_from_utf8()
 
 		return ""
+
+	func get_buffer(length: int) -> PackedByteArray:
+		if stream is FileAccess: return stream.get_buffer(length)
+		if stream is StreamPeerBuffer:
+			var pos: int = stream.get_position()
+			return stream.data_array.slice(pos, pos + length)
+		return PackedByteArray()
+
+	func get_point() -> Vector2:
+		return Vector2(self.get_long(), self.get_long())
+
+	func get_size() -> Vector2:
+		return Vector2(self.get_long(), self.get_long())
+
+	func get_rect() -> Rect2:
+		return Rect2(
+			self.get_long(),
+			self.get_long(),
+			self.get_long(),
+			self.get_long()
+		)
+
+	func get_pixel(color_depth: int) -> Color:
+		if color_depth == 8:
+			var r := self.get_byte()
+			return Color(r, 0, 0, 255)
+
+		if color_depth == 16:
+			var v := self.get_byte()
+			var a := self.get_byte()
+			return Color(v, v, v, a)
+
+		if color_depth == 32:
+			var r := self.get_byte()
+			var g := self.get_byte()
+			var b := self.get_byte()
+			var a := self.get_byte()
+			return Color(r, g, b, a)
+
+		return Color(0, 0, 0, 0)
+
+	func get_uuid() -> String:
+		var buf := self.get_buffer(16)
+
+		if buf.size() != 16:
+			return ""
+
+		var hex := ""
+		for i in range(buf.size()):
+			hex += "%02x" % buf[i]
+
+		return hex
