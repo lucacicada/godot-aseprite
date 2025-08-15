@@ -848,9 +848,9 @@ class Frame extends RefCounted:
 
 	var cels: Array[Cel] = []
 
-	# func get_chunks_count() -> int:
-	# 	# Per spec, use old chunks count if new chunks count is zero
-	# 	return chunks_num_old if chunks_num_new == 0 else chunks_num_new
+	func get_chunks_count() -> int:
+		# Per spec, use old chunks count if new chunks count is zero
+		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
 
 	func get_image(layer_index: int) -> Image:
 		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
@@ -1336,15 +1336,11 @@ class Tileset extends RefCounted:
 		)
 
 # FileAccess does not extend StreamPeer...
-class _BinaryReader extends RefCounted:
-	var stream: Variant
+class AsepriteFileReader extends RefCounted:
+	var stream: Variant = null
 
 	func open(data: Variant):
 		if data is FileAccess:
-			data.big_endian = false
-			self.stream = data
-
-		elif data is StreamPeerBuffer:
 			data.big_endian = false
 			self.stream = data
 
@@ -1354,100 +1350,90 @@ class _BinaryReader extends RefCounted:
 			buffer.big_endian = false
 			self.stream = buffer
 
+		elif data is StreamPeer:
+			data.big_endian = false
+			self.stream = data
+
 	func close() -> void:
 		if stream is FileAccess: stream.close()
 		stream = null
 
-	func get_length() -> int:
-		if stream is FileAccess: return stream.get_length()
-		if stream is StreamPeerBuffer: return stream.get_size()
-		return -1
+	func skip(bytes: int) -> void:
+		if stream is FileAccess: stream.seek(stream.get_position() + bytes)
+		elif stream is StreamPeerBuffer: stream.seek(stream.get_position() + bytes)
 
-	func get_position() -> int:
-		if stream is FileAccess: return stream.get_position()
-		if stream is StreamPeerBuffer: return stream.get_position()
-		return -1
-
-	func seek(position: int) -> void:
-		if stream is FileAccess: stream.seek(position)
-		elif stream is StreamPeerBuffer: stream.seek(position)
+		# StreamPeer might read from the network, we cant just move forward
+		elif stream is StreamPeer:
+			for i in range(bytes):
+				if stream.get_available_bytes() > 0: stream.get_8()
+				else: break
 
 	## An 8-bit unsigned integer value
 	func get_byte() -> int:
 		if stream is FileAccess: return stream.get_8()
-		if stream is StreamPeerBuffer: return stream.get_8()
+		if stream is StreamPeer: return stream.get_8()
 		return -1
 
 	## A 16-bit unsigned integer value
 	func get_word() -> int:
 		if stream is FileAccess: return stream.get_16()
-		if stream is StreamPeerBuffer: return stream.get_16()
+		if stream is StreamPeer: return stream.get_16()
 		return -1
 
 	## A 32-bit unsigned integer value
 	func get_dword() -> int:
 		if stream is FileAccess: return stream.get_32()
-		if stream is StreamPeerBuffer: return stream.get_32()
+		if stream is StreamPeer: return stream.get_32()
 		return -1
 
 	## A 16-bit signed integer value
 	func get_short() -> int:
 		if stream is FileAccess: return stream.get_16()
-		if stream is StreamPeerBuffer: return stream.get_16()
+		if stream is StreamPeer: return stream.get_16()
 		return -1
 
 	## A 32-bit signed integer value
 	func get_long() -> int:
 		if stream is FileAccess: return stream.get_32()
-		if stream is StreamPeerBuffer: return stream.get_32()
+		if stream is StreamPeer: return stream.get_32()
 		return -1
 
 	## A 32-bit fixed point (16.16) value
 	func get_fixed() -> float:
 		if stream is FileAccess: return stream.get_32() << 16
-		if stream is StreamPeerBuffer: return stream.get_32() << 16
+		if stream is StreamPeer: return stream.get_32() << 16
 		return 0.0
 
 	## A 32-bit single-precision value
 	func get_float() -> float:
 		if stream is FileAccess: return stream.get_float()
-		if stream is StreamPeerBuffer: return stream.get_float()
+		if stream is StreamPeer: return stream.get_float()
 		return 0.0
 
 	## A 64-bit double-precision value
 	func get_double() -> float:
 		if stream is FileAccess: return stream.get_double()
-		if stream is StreamPeerBuffer: return stream.get_double()
+		if stream is StreamPeer: return stream.get_double()
 		return 0.0
 
 	## A 64-bit unsigned integer value
 	func get_qword() -> int:
 		if stream is FileAccess: return stream.get_64()
-		if stream is StreamPeerBuffer: return stream.get_64()
+		if stream is StreamPeer: return stream.get_64()
 		return -1
 
 	## A 64-bit signed integer value
 	func get_long64() -> int:
 		if stream is FileAccess: return stream.get_64()
-		if stream is StreamPeerBuffer: return stream.get_64()
+		if stream is StreamPeer: return stream.get_64()
 		return -1
 
 	func get_string() -> String:
-		if stream is FileAccess: return stream.get_buffer(stream.get_16()).get_string_from_utf8()
-
-		if stream is StreamPeerBuffer:
-			var pos: int = stream.get_position()
-			var buf: PackedByteArray = stream.data_array
-			var string_len: int = stream.get_16()
-			return buf.slice(pos, pos + string_len).get_string_from_utf8()
-
-		return ""
+		return self.get_buffer(self.get_word()).get_string_from_utf8()
 
 	func get_buffer(length: int) -> PackedByteArray:
 		if stream is FileAccess: return stream.get_buffer(length)
-		if stream is StreamPeerBuffer:
-			var pos: int = stream.get_position()
-			return stream.data_array.slice(pos, pos + length)
+		if stream is StreamPeer: return stream.get_data(length)[1]
 		return PackedByteArray()
 
 	func get_point() -> Vector2:
@@ -1494,3 +1480,98 @@ class _BinaryReader extends RefCounted:
 			hex += "%02x" % buf[i]
 
 		return hex
+
+
+	func read_header():
+		## Header
+		# A 128-byte header (same as FLC/FLI header, but with other magic number):
+		#     DWORD       File size
+		#     WORD        Magic number (0xA5E0)
+		#     WORD        Frames
+		#     WORD        Width in pixels
+		#     WORD        Height in pixels
+		#     WORD        Color depth (bits per pixel)
+		#                   32 bpp = RGBA
+		#                   16 bpp = Grayscale
+		#                   8 bpp = Indexed
+		#     DWORD       Flags (see NOTE.6):
+		#                   1 = Layer opacity has valid value
+		#                   2 = Layer blend mode/opacity is valid for groups
+		#                       (composite groups separately first when rendering)
+		#                   4 = Layers have an UUID
+		#     WORD        Speed (milliseconds between frame, like in FLC files)
+		#                 DEPRECATED: You should use the frame duration field
+		#                 from each frame header
+		#     DWORD       Set be 0
+		#     DWORD       Set be 0
+		#     BYTE        Palette entry (index) which represent transparent color
+		#                 in all non-background layers (only for Indexed sprites).
+		#     BYTE[3]     Ignore these bytes
+		#     WORD        Number of colors (0 means 256 for old sprites)
+		#     BYTE        Pixel width (pixel ratio is "pixel width/pixel height").
+		#                 If this or pixel height field is zero, pixel ratio is 1:1
+		#     BYTE        Pixel height
+		#     SHORT       X position of the grid
+		#     SHORT       Y position of the grid
+		#     WORD        Grid width (zero if there is no grid, grid size
+		#                 is 16x16 on Aseprite by default)
+		#     WORD        Grid height (zero if there is no grid)
+		#     BYTE[84]    For future (set to zero)
+		var file_size := self.get_dword()
+
+		# Invalid magic number
+		if self.get_word() != 0xA5E0: return ERR_FILE_CORRUPT
+
+		var num_frames := self.get_word()
+		var width := self.get_word()
+		var height := self.get_word()
+		var color_depth := self.get_word()
+		var flags := self.get_dword()
+		var speed := self.get_word()
+
+		# Two consecutive DWORDs must be zero
+		if self.get_dword() != 0: return ERR_FILE_CORRUPT
+		if self.get_dword() != 0: return ERR_FILE_CORRUPT
+
+		var palette_transparent_index := self.get_byte()
+		self.skip(3)
+		var num_colors := self.get_word()
+		var pixel_width := self.get_byte()
+		var pixel_height := self.get_byte()
+		var grid_x := self.get_short()
+		var grid_y := self.get_short()
+		var grid_width := self.get_word()
+		var grid_height := self.get_word()
+		self.skip(84)
+
+
+	func read_frame():
+		# After the header come the "frames" data. Each frame has this little
+		# header of 16 bytes:
+		#     DWORD       Bytes in this frame
+		#     WORD        Magic number (always 0xF1FA)
+		#     WORD        Old field which specifies the number of "chunks"
+		#                 in this frame. If this value is 0xFFFF, we might
+		#                 have more chunks to read in this frame
+		#                 (so we have to use the new field)
+		#     WORD        Frame duration (in milliseconds)
+		#     BYTE[2]     For future (set to zero)
+		#     DWORD       New field which specifies the number of "chunks"
+		#                 in this frame (if this is 0, use the old field)
+		# Then each chunk format is:
+		#     DWORD       Chunk size
+		#     WORD        Chunk type
+		#     BYTE[]      Chunk data
+		# The chunk size includes the DWORD of the size itself, and the WORD of
+		# the chunk type, so a chunk size must be equal or greater than 6 bytes
+		# at least.
+		var frame := Frame.new()
+
+		frame.frame_size = self.get_dword()
+		if self.get_word() != 0xF1FA: return null
+		frame.chunks_num_old = self.get_word()
+		frame.duration = self.get_word()
+		self.skip(2) # For future (set to zero)
+		frame.chunks_num_new = self.get_dword()
+
+		return frame
