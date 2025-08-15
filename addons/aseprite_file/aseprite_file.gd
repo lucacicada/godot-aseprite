@@ -42,7 +42,7 @@
 # SHORT: `fs.get_16()`
 # DWORD: `fs.get_32()`
 # LONG: `fs.get_32()`
-# FIXED: `fs.get_32() / 65536.0`
+# FIXED: `fs.get_32() << 16`
 # FLOAT: `fs.get_32()`
 # DOUBLE: `fs.get_64()`
 # QWORD: `fs.get_64()`
@@ -156,6 +156,8 @@ var grid_height: int = 0
 
 ## The palette used in the sprite.
 var palette: Palette = Palette.new()
+
+var color_profile: ColorProfile = ColorProfile.new()
 
 ## Frames in the sprite.
 var frames: Array[Frame] = []
@@ -402,6 +404,67 @@ func open(path: String) -> int:
 						# Aseprite - Cel buffer size mismatch
 						if buf.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
 							return ERR_FILE_CORRUPT
+
+				# Cel Extra Chunk (0x2006)
+				0x2006:
+					var cel_extra := CelExtra.new()
+
+					# Adds extra information to the latest read cel.
+
+					#     DWORD       Flags (set to zero)
+					#                   1 = Precise bounds are set
+					#     FIXED       Precise X position
+					#     FIXED       Precise Y position
+					#     FIXED       Width of the cel in the sprite (scaled in real-time)
+					#     FIXED       Height of the cel in the sprite
+					#     BYTE[16]    For future use (set to zero)
+
+					cel_extra._chunk_index = chunk_index
+					cel_extra.flags = fs.get_16()
+					cel_extra.precise_x = fs.get_32() << 16
+					cel_extra.precise_y = fs.get_32() << 16
+					cel_extra.width = fs.get_32() << 16
+					cel_extra.height = fs.get_32() << 16
+					fs.seek(fs.get_position() + 16)
+
+					frame.cels[frame.cels.size() - 1].extra = cel_extra
+
+
+				# Color Profile Chunk
+				0x2007:
+					self.color_profile = ColorProfile.new()
+					#   Color profile for RGB or grayscale values.
+
+					# WORD        Type
+					#               0 - no color profile (as in old .aseprite files)
+					#               1 - use sRGB
+					#               2 - use the embedded ICC profile
+					# WORD        Flags
+					#               1 - use special fixed gamma
+					# FIXED       Fixed gamma (1.0 = linear)
+					#             Note: The gamma in sRGB is 2.2 in overall but it doesn't use
+					#             this fixed gamma, because sRGB uses different gamma sections
+					#             (linear and non-linear). If sRGB is specified with a fixed
+					#             gamma = 1.0, it means that this is Linear sRGB.
+					# BYTE[8]     Reserved (set to zero)
+					# + If type = ICC:
+					#   DWORD     ICC profile data length
+					#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
+
+					self.color_profile._chunk_index = chunk_index
+					self.color_profile.type = fs.get_16()
+					self.color_profile.flags = fs.get_16()
+					self.color_profile.fixed_gamma = fs.get_32() << 16
+					fs.seek(fs.get_position() + 8) # Skip reserved bytes
+
+					if self.color_profile.type == 2:
+						var icc_data_len := fs.get_32()
+
+						# Aseprite - Color profile data size mismatch
+						if icc_data_len != ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position):
+							return ERR_FILE_CORRUPT
+
+						self.color_profile.icc_data = fs.get_buffer(icc_data_len)
 
 				# Palette Chunk
 				0x2019:
@@ -994,6 +1057,8 @@ class Cel extends RefCounted:
 
 	var buffer: PackedByteArray = []
 
+	var extra: CelExtra = null
+
 	# TODO: add support for compressed tilemaps and linked cels
 	func get_image() -> Image:
 		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
@@ -1091,6 +1156,35 @@ class Cel extends RefCounted:
 			Image.FORMAT_RGBA8,
 			self.buffer,
 		)
+
+class CelExtra extends RefCounted:
+	## The index of the chunk that this extra cel belongs to.
+	var _chunk_index: int = -1
+
+	var flags: int = 0
+
+	var precise_x: float = 0.0
+	var precise_y: float = 0.0
+	var width: float = 0.0
+	var height: float = 0.0
+
+## 0x2007
+class ColorProfile extends RefCounted:
+	## The index of the chunk that this color profile belongs to.
+	var _chunk_index: int = -1
+
+	## Color profile type
+	## 0 - no color profile (as in old .aseprite files)
+	## 1 - use sRGB
+	## 2 - use the embedded ICC profile
+	var type: int = 0
+
+	var flags: int = 0
+
+	var fixed_gamma: float = 0.0
+
+	## ICC Color profile data
+	var icc_data: PackedByteArray = []
 
 ## 0x2023
 class Tileset extends RefCounted:
