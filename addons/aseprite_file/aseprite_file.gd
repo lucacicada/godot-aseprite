@@ -1,61 +1,3 @@
-# ## References
-
-# ASE files use Intel (little-endian) byte order.
-
-# * `BYTE`: An 8-bit unsigned integer value
-# * `WORD`: A 16-bit unsigned integer value
-# * `SHORT`: A 16-bit signed integer value
-# * `DWORD`: A 32-bit unsigned integer value
-# * `LONG`: A 32-bit signed integer value
-# * `FIXED`: A 32-bit fixed point (16.16) value
-# * `FLOAT`: A 32-bit single-precision value
-# * `DOUBLE`: A 64-bit double-precision value
-# * `QWORD`: A 64-bit unsigned integer value
-# * `LONG64`: A 64-bit signed integer value
-# * `BYTE[n]`: "n" bytes.
-# * `STRING`:
-#   - `WORD`: string length (number of bytes)
-#   - `BYTE[length]`: characters (in UTF-8)
-#   The `'\0'` character is not included.
-# * `POINT`:
-#   - `LONG`: X coordinate value
-#   - `LONG`: Y coordinate value
-# * `SIZE`:
-#   - `LONG`: Width value
-#   - `LONG`: Height value
-# * `RECT`:
-#   - `POINT`: Origin coordinates
-#   - `SIZE`: Rectangle size
-# * `PIXEL`: One pixel, depending on the image pixel format:
-#   - **RGBA**: `BYTE[4]`, each pixel have 4 bytes in this order Red, Green, Blue, Alpha.
-#   - **Grayscale**: `BYTE[2]`, each pixel have 2 bytes in the order Value, Alpha.
-#   - **Indexed**: `BYTE`, each pixel uses 1 byte (the index).
-# * `TILE`: **Tilemaps**: Each tile can be a 8-bit (`BYTE`), 16-bit
-#   (`WORD`), or 32-bit (`DWORD`) value and there are masks related to
-#   the meaning of each bit.
-# * `UUID`: A Universally Unique Identifier stored as `BYTE[16]`.
-
-# Godot implementations, unsigned by default are used:
-
-# BYTE: `fs.get_8()`
-# WORD: `fs.get_16()`
-# SHORT: `fs.get_16()`
-# DWORD: `fs.get_32()`
-# LONG: `fs.get_32()`
-# FIXED: `fs.get_32() << 16`
-# FLOAT: `fs.get_32()`
-# DOUBLE: `fs.get_64()`
-# QWORD: `fs.get_64()`
-# LONG64: `fs.get_64()`
-# BYTE[n]: `fs.get_buffer(n)`
-# STRING: `var size := fs.get_16(); var str := fs.get_buffer(size).get_string_from_utf8()`
-# POINT: `Vector2(fs.get_32(), fs.get_32())`
-# SIZE: `Vector2(fs.get_32(), fs.get_32())`
-# RECT: `Rect2(fs.get_32(), fs.get_32(), fs.get_32(), fs.get_32())`
-# PIXEL: `fs.get_buffer(4)` for RGBA, `fs.get_buffer(2)` for Grayscale, `fs.get_8()` for Indexed
-# TILE: `fs.get_8()`, `fs.get_16()`, or `fs.get_32()` depending on the tile size
-# UUID: `fs.get_buffer(16)`
-
 ## This class is used to read Aseprite files and extract metadata such as frames and layers.
 class_name AsepriteFile extends RefCounted
 
@@ -168,13 +110,13 @@ var layers: Array[Layer] = []
 ## A tileset is a collection of individual tiles, arranged in a grid.
 var tilesets: Array[Tileset] = []
 
-var __consumed: bool = false
+var _reader: AsepriteFileReader = null
 
 ## Opens the Aseprite file for reading.
 ## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
 func open(path: String) -> int:
 	# Do not allow to re-open the file
-	if __consumed: return ERR_ALREADY_IN_USE
+	if _reader: return ERR_ALREADY_IN_USE
 
 	# Reset the state, in the future maybe we can reuse this instance
 	self.file_size = -1
@@ -186,50 +128,42 @@ func open(path: String) -> int:
 	if not fs: return FileAccess.get_open_error()
 
 	# The file is too short to be a valid Aseprite file
-	if fs.get_length() < 128:
-		return ERR_FILE_EOF
+	if fs.get_length() < 128: return ERR_FILE_EOF
 
-	fs.big_endian = false
+	self._reader = AsepriteFileReader.new()
+	self._reader.open(fs)
 
 	# Read the header
-	self.file_size = fs.get_32()
+	self.file_size = _reader.get_dword()
 
 	# Check the magic number
-	if fs.get_16() != 0xA5E0:
-		return ERR_FILE_CORRUPT
+	if _reader.get_word() != 0xA5E0: return ERR_FILE_CORRUPT
 
-	# The file is too short
-	if fs.get_length() < self.file_size:
-		return ERR_FILE_EOF
+	self.num_frames = _reader.get_word()
+	self.width = _reader.get_word()
+	self.height = _reader.get_word()
+	self.color_depth = _reader.get_word()
+	self.flags = _reader.get_dword()
+	self.speed = _reader.get_word()
 
-	self.num_frames = fs.get_16()
-	self.width = fs.get_16()
-	self.height = fs.get_16()
-	self.color_depth = fs.get_16()
-	self.flags = fs.get_32()
-	self.speed = fs.get_16()
+	# # Two consecutive DWORDs must be zero
+	# if _reader.get_dword() != 0: return ERR_FILE_CORRUPT
+	# if _reader.get_dword() != 0: return ERR_FILE_CORRUPT
+	_reader.skip(8) # Skip 2*4 bytes
 
-	# Two consecutive DWORDs must be zero
-	if fs.get_32() != 0:
-		return ERR_FILE_CORRUPT
-
-	if fs.get_32() != 0:
-		return ERR_FILE_CORRUPT
-
-	self.palette_entry = fs.get_8()
-	fs.seek(fs.get_position() + 3) # Skip 3 bytes
-	self.num_colors = fs.get_16()
-	self.pixel_width = fs.get_8()
-	self.pixel_height = fs.get_8()
-	self.grid_x = fs.get_16()
-	self.grid_y = fs.get_16()
-	self.grid_width = fs.get_16()
-	self.grid_height = fs.get_16()
-	fs.seek(fs.get_position() + 84) # Skip the rest of the header
+	self.palette_entry = _reader.get_byte()
+	_reader.skip(3) # Skip 3 bytes
+	self.num_colors = _reader.get_word()
+	self.pixel_width = _reader.get_byte()
+	self.pixel_height = _reader.get_byte()
+	self.grid_x = _reader.get_word()
+	self.grid_y = _reader.get_word()
+	self.grid_width = _reader.get_word()
+	self.grid_height = _reader.get_word()
+	_reader.skip(84)
 
 	# Sanity check for header size
-	if fs.get_position() != 128:
-		return ERR_FILE_EOF
+	if fs.get_position() != 128: return ERR_FILE_EOF
 
 	# Read the frames
 	for _frame_index in range(self.num_frames):
@@ -237,20 +171,15 @@ func open(path: String) -> int:
 		self.frames.append(frame)
 
 		# Read the frame header
-
-		frame._position = fs.get_position()
-		frame.frame_size = fs.get_32()
+		frame.frame_size = _reader.get_dword()
 
 		# Aseprite - Invalid frame magic number
-		if fs.get_16() != 0xF1FA:
-			return ERR_FILE_CORRUPT
+		if _reader.get_word() != 0xF1FA: return ERR_FILE_CORRUPT
 
-		frame.chunks_num_old = fs.get_16()
-		frame.duration = fs.get_16()
-
-		fs.seek(fs.get_position() + 2) # Skip 2 bytes
-
-		frame.chunks_num_new = fs.get_32()
+		frame.chunks_num_old = _reader.get_word()
+		frame.duration = _reader.get_word()
+		_reader.skip(2) # For future (set to zero)
+		frame.chunks_num_new = _reader.get_dword()
 
 		# Per spec, use old chunks count if new chunks count is zero
 		var chunks_num := frame.chunks_num_old if frame.chunks_num_new == 0 else frame.chunks_num_new
@@ -263,8 +192,8 @@ func open(path: String) -> int:
 			# Read the chunk header
 
 			ase_chunk._position = fs.get_position()
-			ase_chunk.chunk_size = fs.get_32()
-			ase_chunk.chunk_type = fs.get_16()
+			ase_chunk.chunk_size = _reader.get_dword()
+			ase_chunk.chunk_type = _reader.get_word()
 
 			match ase_chunk.chunk_type:
 				# Layer Chunk
@@ -288,25 +217,17 @@ func open(path: String) -> int:
 					# + If file header flags have bit 4:
 					#   UUID      Layer's universally unique identifier
 
-					layer._chunk_index = chunk_index
-					layer.flags = fs.get_16()
-					layer.type = fs.get_16()
-					layer.child_level = fs.get_16()
-					layer.default_width = fs.get_16()
-					layer.default_height = fs.get_16()
-					layer.blend_mode = fs.get_16()
-					layer.opacity = fs.get_8()
-
-					fs.seek(fs.get_position() + 3)
-
-					layer.name = fs.get_buffer(fs.get_16()).get_string_from_utf8()
-
-					if layer.type == 2:
-						layer.tileset_index = fs.get_32()
-
-					if layer.flags & 4:
-						# UUID is 16 bytes long
-						layer.uuid = fs.get_buffer(16).get_string_from_utf8()
+					layer.flags = _reader.get_word()
+					layer.type = _reader.get_word()
+					layer.child_level = _reader.get_word()
+					layer.default_width = _reader.get_word()
+					layer.default_height = _reader.get_word()
+					layer.blend_mode = _reader.get_word()
+					layer.opacity = _reader.get_byte()
+					_reader.skip(3) # Skip 3 bytes for future use
+					layer.name = _reader.get_string()
+					if layer.type == 2: layer.tileset_index = _reader.get_dword()
+					if layer.flags & 4: layer.uuid = _reader.get_uuid()
 
 				# Cel Chunk
 				0x2005:
@@ -345,19 +266,17 @@ func open(path: String) -> int:
 					#   TILE[]    Row by row, from top to bottom tile by tile
 					#             compressed with ZLIB method (see NOTE.3)
 
-					cel._chunk_index = chunk_index
-					cel.layer_index = fs.get_16()
-					cel.x = fs.get_16()
-					cel.y = fs.get_16()
-					cel.opacity = fs.get_8()
-					cel.type = fs.get_16()
-					cel.z_index = fs.get_16()
-
-					fs.seek(fs.get_position() + 5)
+					cel.layer_index = _reader.get_word()
+					cel.x = _reader.get_word()
+					cel.y = _reader.get_word()
+					cel.opacity = _reader.get_byte()
+					cel.type = _reader.get_word()
+					cel.z_index = _reader.get_word()
+					_reader.skip(5) # Skip 5 bytes for future use
 
 					if cel.type == 0:
-						cel.w = fs.get_16()
-						cel.h = fs.get_16()
+						cel.w = _reader.get_word()
+						cel.h = _reader.get_word()
 
 						var buf = fs.get_buffer(ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
 						cel.buffer = buf
@@ -367,39 +286,38 @@ func open(path: String) -> int:
 							return ERR_FILE_CORRUPT
 
 					elif cel.type == 1:
-						cel.link = fs.get_16()
+						cel.link = _reader.get_word()
 
 					elif cel.type == 2:
-						cel.w = fs.get_16()
-						cel.h = fs.get_16()
+						cel.w = _reader.get_word()
+						cel.h = _reader.get_word()
+
+						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 26)
 
 						# ZLIB compressed buffer
-						var buf := fs.get_buffer(ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
-						buf = buf.decompress_dynamic(-1, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						cel.buffer = buf
+						cel.buffer = cel.buffer.decompress_dynamic(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Aseprite - Cel buffer size mismatch
-						if buf.size() != cel.w * cel.h * (self.color_depth / 8):
+						# Cel buffer size mismatch
+						if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
 							return ERR_FILE_CORRUPT
 
 					elif cel.type == 3:
-						cel.w = fs.get_16()
-						cel.h = fs.get_16()
-						cel.bits_per_tile = fs.get_16()
-						cel.bitmask_for_tile_id = fs.get_32()
-						cel.bitmask_for_x_flip = fs.get_32()
-						cel.bitmask_for_y_flip = fs.get_32()
-						cel.bitmask_for_90cw_rotation = fs.get_32()
+						cel.w = _reader.get_word()
+						cel.h = _reader.get_word()
+						cel.bits_per_tile = _reader.get_word()
+						cel.bitmask_for_tile_id = _reader.get_dword()
+						cel.bitmask_for_x_flip = _reader.get_dword()
+						cel.bitmask_for_y_flip = _reader.get_dword()
+						cel.bitmask_for_90cw_rotation = _reader.get_dword()
+						_reader.skip(10) # Skip 10 bytes for reserved
 
-						fs.seek(fs.get_position() + 10) # Skip reserved bytes
+						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 54)
 
 						# ZLIB compressed buffer
-						var buf := fs.get_buffer(ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
-						buf = buf.decompress_dynamic(-1, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						cel.buffer = buf
+						cel.buffer = cel.buffer.decompress_dynamic(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Aseprite - Cel buffer size mismatch
-						if buf.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
+						# Cel buffer size mismatch
+						if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
 							return ERR_FILE_CORRUPT
 
 				# Cel Extra Chunk (0x2006)
@@ -416,13 +334,12 @@ func open(path: String) -> int:
 					#     FIXED       Height of the cel in the sprite
 					#     BYTE[16]    For future use (set to zero)
 
-					cel_extra._chunk_index = chunk_index
-					cel_extra.flags = fs.get_16()
-					cel_extra.precise_x = fs.get_32() << 16
-					cel_extra.precise_y = fs.get_32() << 16
-					cel_extra.width = fs.get_32() << 16
-					cel_extra.height = fs.get_32() << 16
-					fs.seek(fs.get_position() + 16)
+					cel_extra.flags = _reader.get_word()
+					cel_extra.precise_x = _reader.get_fixed()
+					cel_extra.precise_y = _reader.get_fixed()
+					cel_extra.width = _reader.get_fixed()
+					cel_extra.height = _reader.get_fixed()
+					_reader.skip(16) # Skip 16 bytes for future use
 
 					frame.cels[frame.cels.size() - 1].extra = cel_extra
 
@@ -448,20 +365,19 @@ func open(path: String) -> int:
 					#   DWORD     ICC profile data length
 					#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
 
-					self.color_profile._chunk_index = chunk_index
-					self.color_profile.type = fs.get_16()
-					self.color_profile.flags = fs.get_16()
-					self.color_profile.fixed_gamma = fs.get_32() << 16
-					fs.seek(fs.get_position() + 8) # Skip reserved bytes
+					self.color_profile.type = _reader.get_word()
+					self.color_profile.flags = _reader.get_word()
+					self.color_profile.fixed_gamma = _reader.get_fixed()
+					_reader.skip(8)
 
 					if self.color_profile.type == 2:
-						var icc_data_len := fs.get_32()
+						var icc_data_len := _reader.get_dword()
 
 						# Aseprite - Color profile data size mismatch
 						if icc_data_len != ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position):
 							return ERR_FILE_CORRUPT
 
-						self.color_profile.icc_data = fs.get_buffer(icc_data_len)
+						self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
 
 				# Palette Chunk
 				0x2019:
@@ -482,12 +398,10 @@ func open(path: String) -> int:
 					#   + If has name bit in entry flags
 					#     STRING  Color name
 
-					self.palette._chunk_index = chunk_index
-					self.palette.palette_size = fs.get_32()
-					self.palette.first_color = fs.get_32()
-					self.palette.last_color = fs.get_32()
-
-					fs.seek(fs.get_position() + 8)
+					self.palette.palette_size = _reader.get_dword()
+					self.palette.first_color = _reader.get_dword()
+					self.palette.last_color = _reader.get_dword()
+					_reader.skip(8) # Skip 8 bytes for future use
 
 					# Read the palette colors
 
@@ -495,14 +409,14 @@ func open(path: String) -> int:
 						var palette_color := PaletteColor.new()
 						self.palette.colors.append(palette_color)
 
-						palette_color.flags = fs.get_16()
-						palette_color.red = fs.get_8()
-						palette_color.green = fs.get_8()
-						palette_color.blue = fs.get_8()
-						palette_color.alpha = fs.get_8()
+						palette_color.flags = _reader.get_word()
+						palette_color.red = _reader.get_byte()
+						palette_color.green = _reader.get_byte()
+						palette_color.blue = _reader.get_byte()
+						palette_color.alpha = _reader.get_byte()
 
 						if palette_color.flags & PALETTE_COLOR_FLAG_HAS_NAME:
-							palette_color.name = fs.get_buffer(fs.get_16()).get_string_from_utf8()
+							palette_color.name = _reader.get_string()
 
 					assert(self.palette.palette_size == self.palette.colors.size(), "Aseprite - Palette size mismatch: expected %d, got %d" % [self.palette.palette_size, self.palette.colors.size()])
 
@@ -511,37 +425,34 @@ func open(path: String) -> int:
 					var tileset := Tileset.new()
 					self.tilesets.append(tileset)
 
-					tileset._chunk_index = chunk_index
-					tileset.id = fs.get_32()
-					tileset.flags = fs.get_32()
-					tileset.tiles_count = fs.get_32()
-					tileset.tile_width = fs.get_16()
-					tileset.tile_height = fs.get_16()
-					tileset.base_index = fs.get_16()
-					fs.seek(fs.get_position() + 14) # Reserved bytes
-					tileset.name = fs.get_buffer(fs.get_16()).get_string_from_utf8()
+					tileset.id = _reader.get_dword()
+					tileset.flags = _reader.get_dword()
+					tileset.tiles_count = _reader.get_dword()
+					tileset.tile_width = _reader.get_word()
+					tileset.tile_height = _reader.get_word()
+					tileset.base_index = _reader.get_word()
+					_reader.skip(14)
+					tileset.name = _reader.get_string()
 
 					if tileset.flags & 1 != 0:
-						tileset.external_file_id = fs.get_16()
-						tileset.external_id = fs.get_16()
+						tileset.external_file_id = _reader.get_word()
+						tileset.external_id = _reader.get_word()
 
 					if tileset.flags & 2 != 0:
-						var data_len := fs.get_32()
+						var data_len := _reader.get_dword()
 
-						assert(data_len == ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
+						tileset.buffer = _reader.get_buffer(data_len)
 
 						# ZLIB compressed buffer
-						var buf := fs.get_buffer(ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
-						buf = buf.decompress_dynamic(-1, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						tileset.buffer = buf
+						tileset.buffer = tileset.buffer.decompress_dynamic(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Aseprite - Cel buffer size mismatch
-						if buf.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
+						# Cel buffer size mismatch
+						if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
 							return ERR_FILE_CORRUPT
 
 				_:
 					# Ignore unsupported chunk types
-					fs.seek(fs.get_position() + ase_chunk.chunk_size - 6)
+					_reader.skip(ase_chunk.chunk_size - 6)
 
 			# Sanity check, make sure we have read the entire chunk
 			if fs.get_position() != ase_chunk._position + ase_chunk.chunk_size:
@@ -551,9 +462,9 @@ func open(path: String) -> int:
 		if chunks_num != frame.chunks.size():
 			return ERR_FILE_CORRUPT
 
-		# Sanity check, make sure we have read the entire frame
-		if fs.get_position() != frame._position + frame.frame_size:
-			return ERR_FILE_EOF
+		# # Sanity check, make sure we have read the entire frame
+		# if fs.get_position() != frame._position + frame.frame_size:
+		# 	return ERR_FILE_EOF
 
 	# Sanity check, this should never happen
 	if self.num_frames != self.frames.size():
@@ -563,13 +474,11 @@ func open(path: String) -> int:
 	if fs.get_position() != self.file_size:
 		return ERR_FILE_EOF
 
-	__consumed = true
-
 	return OK
 
 ## Closes the currently opened file and prevents subsequent read.
 func close() -> void:
-	pass
+	if _reader: _reader.close()
 
 ## Determines if the layer frame is empty.
 ## A layer frame is considered empty if it has no cel for that specified frame.
@@ -881,9 +790,6 @@ static func create_raw_image_from_data(width: int, height: int, color_depth: int
 	)
 
 class Frame extends RefCounted:
-	## Position n bytes of this frame in the original source stream.
-	var _position: int = -1
-
 	## Bytes in this frame
 	var frame_size: int = 0
 
@@ -933,9 +839,6 @@ class Chunk extends RefCounted:
 
 ## 0x2019
 class Palette extends RefCounted:
-	## The index of the chunk that this layer belongs to.
-	var _chunk_index: int = -1
-
 	var palette_size: int = 0
 	var first_color: int = 0
 	var last_color: int = 0
@@ -965,9 +868,6 @@ class PaletteColor extends RefCounted:
 
 ## 0x2004
 class Layer extends RefCounted:
-	## The index of the chunk that this layer belongs to.
-	var _chunk_index: int = -1
-
 	## Layer flags
     ## 1 = Visible
     ## 2 = Editable
@@ -1031,9 +931,6 @@ class Layer extends RefCounted:
 
 ## 0x2005
 class Cel extends RefCounted:
-	## The index of the chunk that this layer belongs to.
-	var _chunk_index: int = -1
-
 	## Layer index
 	var layer_index: int
 
@@ -1076,9 +973,6 @@ class Cel extends RefCounted:
 	var extra: CelExtra = null
 
 class CelExtra extends RefCounted:
-	## The index of the chunk that this extra cel belongs to.
-	var _chunk_index: int = -1
-
 	var flags: int = 0
 
 	var precise_x: float = 0.0
@@ -1088,9 +982,6 @@ class CelExtra extends RefCounted:
 
 ## 0x2007
 class ColorProfile extends RefCounted:
-	## The index of the chunk that this color profile belongs to.
-	var _chunk_index: int = -1
-
 	## Color profile type
 	## 0 - no color profile (as in old .aseprite files)
 	## 1 - use sRGB
@@ -1106,9 +997,6 @@ class ColorProfile extends RefCounted:
 
 ## 0x2023
 class Tileset extends RefCounted:
-	## The index of the chunk that this tileset belongs to.
-	var _chunk_index: int = -1
-
 	var id: int = 0
 
 	#   1 - Include link to external file
@@ -1138,30 +1026,30 @@ class Tileset extends RefCounted:
 # we are supposed to check get_available_bytes() first however i am unusre if
 # get_available_bytes() == 0 means we cant read no more
 class AsepriteFileReader extends RefCounted:
-	var stream: Variant = null
+	var _stream: Variant = null
 
 	func open(data: Variant):
 		if data is FileAccess:
 			data.big_endian = false
-			self.stream = data
+			self._stream = data
 
 		elif data is PackedByteArray:
 			var buffer := StreamPeerBuffer.new()
 			buffer.data_array = data
 			buffer.big_endian = false
-			self.stream = buffer
+			self._stream = buffer
 
 		elif data is StreamPeer:
 			data.big_endian = false
-			self.stream = data
+			self._stream = data
 
 	func close() -> void:
-		if stream is FileAccess: stream.close()
-		stream = null
+		if _stream is FileAccess: _stream.close()
+		_stream = null
 
 	func get_available_bytes() -> int:
-		if stream is FileAccess: return stream.get_length() - stream.get_position()
-		if stream is StreamPeer: return stream.get_available_bytes()
+		if _stream is FileAccess: return _stream.get_length() - _stream.get_position()
+		if _stream is StreamPeer: return _stream.get_available_bytes()
 		return 0
 
 	# Skip `bytes`, return the amount of bytes skipped.
@@ -1170,42 +1058,42 @@ class AsepriteFileReader extends RefCounted:
 		# Sanity check, just ignore zero and negative values
 		if bytes <= 0: return 0
 
-		if stream is FileAccess:
-			var len: int = stream.get_length()
-			var pos: int = stream.get_position()
+		if _stream is FileAccess:
+			var len: int = _stream.get_length()
+			var pos: int = _stream.get_position()
 
 			# We cant read past the end of the stream
 			if pos + bytes > len:
 				bytes = len - pos
 				if bytes <= 0: return 0
 
-			stream.seek(pos + bytes)
+			_stream.seek(pos + bytes)
 			return bytes
 
-		elif stream is StreamPeerBuffer:
-			var len: int = stream.data_array.size()
-			var pos: int = stream.get_position()
+		elif _stream is StreamPeerBuffer:
+			var len: int = _stream.data_array.size()
+			var pos: int = _stream.get_position()
 
 			# We cant read past the end of the stream
 			if pos + bytes > len:
 				bytes = len - pos
 				if bytes <= 0: return 0
 
-			stream.seek(pos + bytes)
+			_stream.seek(pos + bytes)
 			return bytes
 
 		# StreamPeer might read from the network, we cant just move forward
-		elif stream is StreamPeer:
+		elif _stream is StreamPeer:
 			var index := 0
 
 			# I miss the regular old-school for loops...
 			for _i in range(bytes):
 				# If get_available_bytes is 0, we are at the end of the stream
 				# I suspect some future StreamPeer might return 0 even tho there are bytes available
-				if stream.get_available_bytes() == 0:
+				if _stream.get_available_bytes() == 0:
 					return index
 
-				stream.get_8()
+				_stream.get_8()
 				index += 1
 
 			return index
@@ -1214,70 +1102,70 @@ class AsepriteFileReader extends RefCounted:
 
 	## An 8-bit unsigned integer value
 	func get_byte() -> int:
-		if stream is FileAccess: return stream.get_8()
-		if stream is StreamPeer: return stream.get_8()
+		if _stream is FileAccess: return _stream.get_8()
+		if _stream is StreamPeer: return _stream.get_8()
 		return -1
 
 	## A 16-bit unsigned integer value
 	func get_word() -> int:
-		if stream is FileAccess: return stream.get_16()
-		if stream is StreamPeer: return stream.get_16()
+		if _stream is FileAccess: return _stream.get_16()
+		if _stream is StreamPeer: return _stream.get_16()
 		return -1
 
 	## A 32-bit unsigned integer value
 	func get_dword() -> int:
-		if stream is FileAccess: return stream.get_32()
-		if stream is StreamPeer: return stream.get_32()
+		if _stream is FileAccess: return _stream.get_32()
+		if _stream is StreamPeer: return _stream.get_32()
 		return -1
 
 	## A 16-bit signed integer value
 	func get_short() -> int:
-		if stream is FileAccess: return stream.get_16()
-		if stream is StreamPeer: return stream.get_16()
+		if _stream is FileAccess: return _stream.get_16()
+		if _stream is StreamPeer: return _stream.get_16()
 		return -1
 
 	## A 32-bit signed integer value
 	func get_long() -> int:
-		if stream is FileAccess: return stream.get_32()
-		if stream is StreamPeer: return stream.get_32()
+		if _stream is FileAccess: return _stream.get_32()
+		if _stream is StreamPeer: return _stream.get_32()
 		return -1
 
 	## A 32-bit fixed point (16.16) value
 	func get_fixed() -> float:
-		if stream is FileAccess: return stream.get_32() << 16
-		if stream is StreamPeer: return stream.get_32() << 16
+		if _stream is FileAccess: return _stream.get_32() << 16
+		if _stream is StreamPeer: return _stream.get_32() << 16
 		return 0.0
 
 	## A 32-bit single-precision value
 	func get_float() -> float:
-		if stream is FileAccess: return stream.get_float()
-		if stream is StreamPeer: return stream.get_float()
+		if _stream is FileAccess: return _stream.get_float()
+		if _stream is StreamPeer: return _stream.get_float()
 		return 0.0
 
 	## A 64-bit double-precision value
 	func get_double() -> float:
-		if stream is FileAccess: return stream.get_double()
-		if stream is StreamPeer: return stream.get_double()
+		if _stream is FileAccess: return _stream.get_double()
+		if _stream is StreamPeer: return _stream.get_double()
 		return 0.0
 
 	## A 64-bit unsigned integer value
 	func get_qword() -> int:
-		if stream is FileAccess: return stream.get_64()
-		if stream is StreamPeer: return stream.get_64()
+		if _stream is FileAccess: return _stream.get_64()
+		if _stream is StreamPeer: return _stream.get_64()
 		return -1
 
 	## A 64-bit signed integer value
 	func get_long64() -> int:
-		if stream is FileAccess: return stream.get_64()
-		if stream is StreamPeer: return stream.get_64()
+		if _stream is FileAccess: return _stream.get_64()
+		if _stream is StreamPeer: return _stream.get_64()
 		return -1
 
 	func get_string() -> String:
 		return self.get_buffer(self.get_word()).get_string_from_utf8()
 
 	func get_buffer(length: int) -> PackedByteArray:
-		if stream is FileAccess: return stream.get_buffer(length)
-		if stream is StreamPeer: return stream.get_data(length)[1]
+		if _stream is FileAccess: return _stream.get_buffer(length)
+		if _stream is StreamPeer: return _stream.get_data(length)[1]
 		return PackedByteArray()
 
 	func get_point() -> Vector2:
