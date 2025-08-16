@@ -112,12 +112,11 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			continue
 
 		if layer.name.containsn("collision") or layer.name.ends_with("-col"):
-			var frame_img := ase_file.frames[0].get_image(layer_index)
-
-			if not frame_img:
+			if ase_file.is_layer_frame_empty(layer_index, 0):
 				push_warning("Aseprite - Collision layer is empty: %s" % layer.name)
 				continue
 
+			var frame_img := ase_file.get_layer_frame_image(layer_index, 0)
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(frame_img)
 
@@ -140,10 +139,10 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 		for frame_index in range(ase_file.frames.size()):
 			var frame := ase_file.frames[frame_index]
-			var frame_img := frame.get_image(layer_index)
 
-			if frame_img:
-				frame_canvas.append(frame.get_image(layer_index))
+			if not ase_file.is_layer_frame_empty(layer_index, frame_index):
+				var frame_img := ase_file.get_layer_frame_image(layer_index, frame_index)
+				frame_canvas.append(frame_img)
 
 		if frame_canvas.is_empty():
 			continue

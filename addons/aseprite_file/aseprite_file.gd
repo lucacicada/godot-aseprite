@@ -234,7 +234,6 @@ func open(path: String) -> int:
 	# Read the frames
 	for _frame_index in range(self.num_frames):
 		var frame := Frame.new()
-		frame._ase = weakref(self)
 		self.frames.append(frame)
 
 		# Read the frame header
@@ -271,7 +270,6 @@ func open(path: String) -> int:
 				# Layer Chunk
 				0x2004:
 					var layer := Layer.new()
-					layer._ase = weakref(self)
 					self.layers.append(layer)
 
 					# Read the layer data
@@ -313,7 +311,6 @@ func open(path: String) -> int:
 				# Cel Chunk
 				0x2005:
 					var cel := Cel.new()
-					cel._ase = weakref(self)
 					frame.cels.append(cel)
 
 					# Read the cel data
@@ -512,7 +509,6 @@ func open(path: String) -> int:
 				# Tileset Chunk
 				0x2023:
 					var tileset := Tileset.new()
-					tileset._ase = weakref(self)
 					self.tilesets.append(tileset)
 
 					tileset._chunk_index = chunk_index
@@ -665,7 +661,7 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 			var y_flip := (dword & cel.bitmask_for_y_flip) != 0
 			var rotation := (dword & cel.bitmask_for_90cw_rotation) != 0
 
-			var img := tileset.get_tile_image(tile_id)
+			var img := get_tile_image(layer.tileset_index, tile_id)
 
 			# TODO: account for x_flip, y_flip and rotation!
 			# Only if the layer is a tilemap layer those bits are be 0!
@@ -730,6 +726,68 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 		false,
 		Image.FORMAT_RGBA8,
 		cel.buffer,
+	)
+
+func get_tile_image(tileset_index: int, tile_id: int) -> Image:
+	# Let Godot to throw "index out of bounds" error if any of the indexes are invalid
+	var tileset := self.tilesets[tileset_index]
+
+	# Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
+	var stride := tileset.tile_width * tileset.tile_height * (self.color_depth / 8)
+
+	var buffer_pos := tile_id * stride
+	var buf := tileset.buffer.slice(buffer_pos, buffer_pos + stride)
+
+
+	# Godot expands 8-bit indexed images to 32-bit RGBA8
+	if self.color_depth == 8:
+		var rgba8_buf := PackedByteArray()
+		rgba8_buf.resize(tileset.tile_width * tileset.tile_height * 4)
+
+		for i in range(buf.size()):
+			var color_index := buf[i]
+
+			# TODO: handle palette index out of bounds
+			var color := self.palette.colors[color_index]
+
+			rgba8_buf[i * 4 + 0] = color.red
+			rgba8_buf[i * 4 + 1] = color.green
+			rgba8_buf[i * 4 + 2] = color.blue
+			rgba8_buf[i * 4 + 3] = color.alpha
+
+		return Image.create_from_data(
+			tileset.tile_width,
+			tileset.tile_height,
+			false,
+			Image.FORMAT_RGBA8,
+			rgba8_buf,
+		)
+
+	if self.color_depth == 16:
+		var img := Image.create_from_data(
+			tileset.tile_width,
+			tileset.tile_height,
+			false,
+			Image.FORMAT_LA8,
+			buf,
+		)
+
+		# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
+		# In grayscale, RGB channels are all set to the same value
+		# R = BYTE[0]
+		# G = BYTE[0]
+		# B = BYTE[0]
+		# A = BYTE[1]
+		img.convert(Image.FORMAT_RGBA8)
+
+		return img
+
+	return Image.create_from_data(
+		self.tile_width,
+		self.tile_height,
+		false,
+		Image.FORMAT_RGBA8,
+		buf,
 	)
 
 ## Return the image in the `Image.FORMAT_RGBA8` format.
@@ -823,8 +881,6 @@ static func create_raw_image_from_data(width: int, height: int, color_depth: int
 	)
 
 class Frame extends RefCounted:
-	var _ase: WeakRef
-
 	## Position n bytes of this frame in the original source stream.
 	var _position: int = -1
 
@@ -851,42 +907,6 @@ class Frame extends RefCounted:
 	func get_chunks_count() -> int:
 		# Per spec, use old chunks count if new chunks count is zero
 		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
-
-	func get_image(layer_index: int) -> Image:
-		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
-		if not ase_file: return null
-
-		var cels := self.cels
-
-		cels = cels.filter(func(cel: AsepriteFile.Cel): return cel.layer_index == layer_index)
-		# cels = cels.filter(func(cel: AsepriteFile.Cel): return cel.type == 0 or cel.type == 2)
-
-		cels.sort_custom(func(a: AsepriteFile.Cel, b: AsepriteFile.Cel):
-			var orderA := a.layer_index + a.z_index
-			var orderB := b.layer_index + b.z_index
-			return orderA - orderB || a.z_index - b.z_index
-		)
-
-		# Skip empty cels
-		if cels.size() == 0:
-			return null
-
-		var canvas := Image.create_empty(ase_file.width, ase_file.height, false, Image.FORMAT_RGBA8)
-
-		for cel_index in range(cels.size()):
-			var cel := cels[cel_index]
-			var img := cel.get_image()
-
-			if not img:
-				continue
-
-			canvas.blit_rect(
-				img,
-				Rect2i(0, 0, img.get_width(), img.get_height()),
-				Vector2i(cel.x, cel.y)
-			)
-
-		return canvas
 
 class Chunk extends RefCounted:
 	## Position in bytes of this chunk in the original source stream.
@@ -945,8 +965,6 @@ class PaletteColor extends RefCounted:
 
 ## 0x2004
 class Layer extends RefCounted:
-	var _ase: WeakRef
-
 	## The index of the chunk that this layer belongs to.
 	var _chunk_index: int = -1
 
@@ -1013,8 +1031,6 @@ class Layer extends RefCounted:
 
 ## 0x2005
 class Cel extends RefCounted:
-	var _ase: WeakRef
-
 	## The index of the chunk that this layer belongs to.
 	var _chunk_index: int = -1
 
@@ -1059,104 +1075,6 @@ class Cel extends RefCounted:
 
 	var extra: CelExtra = null
 
-	# TODO: add support for compressed tilemaps and linked cels
-	func get_image() -> Image:
-		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
-		if not ase_file: return null
-
-		if self.type == 3:
-			assert(self.bits_per_tile == 32, "Aseprite - Unsupported bits per tile: %d" % self.bits_per_tile)
-
-			var layer := ase_file.layers[self.layer_index]
-
-			assert(layer.type == LAYER_TYPE_TILEMAP, "Aseprite - Cel is not a tilemap layer")
-
-			var tileset := ase_file.tilesets[layer.tileset_index]
-
-			var canvas := Image.create_empty(
-				self.w * tileset.tile_width,
-				self.h * tileset.tile_height,
-				false,
-				Image.FORMAT_RGBA8
-			)
-
-			for i in range(self.buffer.size() / 4):
-				var x1 := self.buffer[i * 4 + 0]
-				var x2 := self.buffer[i * 4 + 1]
-				var x3 := self.buffer[i * 4 + 2]
-				var x4 := self.buffer[i * 4 + 3]
-
-				var dword := (x4 << 24) | (x3 << 16) | (x2 << 8) | x1
-
-				var tile_id := dword & self.bitmask_for_tile_id
-				var x_flip := (dword & self.bitmask_for_x_flip) != 0
-				var y_flip := (dword & self.bitmask_for_y_flip) != 0
-				var rotation := (dword & self.bitmask_for_90cw_rotation) != 0
-
-				var img := tileset.get_tile_image(tile_id)
-
-				canvas.blit_rect(
-					img,
-					Rect2i(0, 0, img.get_width(), img.get_height()),
-					Vector2i(
-						(i % self.w) * tileset.tile_width,
-						(i / self.w) * tileset.tile_height
-					),
-				)
-
-			return canvas
-
-		# Godot expands 8-bit indexed images to 32-bit RGBA8
-		if ase_file.color_depth == 8:
-			var rgba8_buf := PackedByteArray()
-			rgba8_buf.resize(self.w * self.h * 4)
-
-			for i in range(self.buffer.size()):
-				var color_index := self.buffer[i]
-
-				# TODO: handle palette index out of bounds
-				var color := ase_file.palette.colors[color_index]
-
-				rgba8_buf[i * 4 + 0] = color.red
-				rgba8_buf[i * 4 + 1] = color.green
-				rgba8_buf[i * 4 + 2] = color.blue
-				rgba8_buf[i * 4 + 3] = color.alpha
-
-			return Image.create_from_data(
-				self.w,
-				self.h,
-				false,
-				Image.FORMAT_RGBA8,
-				rgba8_buf,
-			)
-
-		if ase_file.color_depth == 16:
-			var img := Image.create_from_data(
-				self.w,
-				self.h,
-				false,
-				Image.FORMAT_LA8,
-				self.buffer,
-			)
-
-			# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
-			# In grayscale, RGB channels are all set to the same value
-			# R = BYTE[0]
-			# G = BYTE[0]
-			# B = BYTE[0]
-			# A = BYTE[1]
-			img.convert(Image.FORMAT_RGBA8)
-
-			return img
-
-		return Image.create_from_data(
-			self.w,
-			self.h,
-			false,
-			Image.FORMAT_RGBA8,
-			self.buffer,
-		)
-
 class CelExtra extends RefCounted:
 	## The index of the chunk that this extra cel belongs to.
 	var _chunk_index: int = -1
@@ -1188,8 +1106,6 @@ class ColorProfile extends RefCounted:
 
 ## 0x2023
 class Tileset extends RefCounted:
-	var _ase: WeakRef
-
 	## The index of the chunk that this tileset belongs to.
 	var _chunk_index: int = -1
 
@@ -1217,125 +1133,10 @@ class Tileset extends RefCounted:
 	var external_id: int = -1
 	var buffer: PackedByteArray = []
 
-	func get_image() -> Image:
-		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
-		assert(ase_file, "Aseprite - No reference to AsepriteFile")
-		if not ase_file: return null
-
-		# Godot expands 8-bit indexed images to 32-bit RGBA8
-		if ase_file.color_depth == 8:
-			var rgba8_buf := PackedByteArray()
-			rgba8_buf.resize(self.tile_width * self.tile_height * 4)
-
-			for i in range(self.buffer.size()):
-				var color_index := self.buffer[i]
-
-				# TODO: handle palette index out of bounds
-				var color := ase_file.palette.colors[color_index]
-
-				rgba8_buf[i * 4 + 0] = color.red
-				rgba8_buf[i * 4 + 1] = color.green
-				rgba8_buf[i * 4 + 2] = color.blue
-				rgba8_buf[i * 4 + 3] = color.alpha
-
-			return Image.create_from_data(
-				self.tile_width,
-				self.tile_height,
-				false,
-				Image.FORMAT_RGBA8,
-				rgba8_buf,
-			)
-
-		if ase_file.color_depth == 16:
-			var img := Image.create_from_data(
-				self.tile_width,
-				self.tile_height,
-				false,
-				Image.FORMAT_LA8,
-				self.buffer,
-			)
-
-			# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
-			# In grayscale, RGB channels are all set to the same value
-			# R = BYTE[0]
-			# G = BYTE[0]
-			# B = BYTE[0]
-			# A = BYTE[1]
-			img.convert(Image.FORMAT_RGBA8)
-
-			return img
-
-		return Image.create_from_data(
-			self.tile_width,
-			self.tile_height,
-			false,
-			Image.FORMAT_RGBA8,
-			self.buffer,
-		)
-
-	func get_tile_image(tile_id: int) -> Image:
-		var ase_file := _ase.get_ref() as AsepriteFile if _ase else null
-		assert(ase_file, "Aseprite - No reference to AsepriteFile")
-		if not ase_file: return null
-
-		# Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
-		var stride := self.tile_width * self.tile_height * (ase_file.color_depth / 8)
-
-		var buffer_pos := tile_id * stride
-		var buf := self.buffer.slice(buffer_pos, buffer_pos + stride)
-
-		# Godot expands 8-bit indexed images to 32-bit RGBA8
-		if ase_file.color_depth == 8:
-			var rgba8_buf := PackedByteArray()
-			rgba8_buf.resize(self.tile_width * self.tile_height * 4)
-
-			for i in range(buf.size()):
-				var color_index := buf[i]
-
-				# TODO: handle palette index out of bounds
-				var color := ase_file.palette.colors[color_index]
-
-				rgba8_buf[i * 4 + 0] = color.red
-				rgba8_buf[i * 4 + 1] = color.green
-				rgba8_buf[i * 4 + 2] = color.blue
-				rgba8_buf[i * 4 + 3] = color.alpha
-
-			return Image.create_from_data(
-				self.tile_width,
-				self.tile_height,
-				false,
-				Image.FORMAT_RGBA8,
-				rgba8_buf,
-			)
-
-		if ase_file.color_depth == 16:
-			var img := Image.create_from_data(
-				self.tile_width,
-				self.tile_height,
-				false,
-				Image.FORMAT_LA8,
-				buf,
-			)
-
-			# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
-			# In grayscale, RGB channels are all set to the same value
-			# R = BYTE[0]
-			# G = BYTE[0]
-			# B = BYTE[0]
-			# A = BYTE[1]
-			img.convert(Image.FORMAT_RGBA8)
-
-			return img
-
-		return Image.create_from_data(
-			self.tile_width,
-			self.tile_height,
-			false,
-			Image.FORMAT_RGBA8,
-			buf,
-		)
-
 # FileAccess does not extend StreamPeer...
+# Additionally, get_xxx() do not return an error if the stream is empty
+# we are supposed to check get_available_bytes() first however i am unusre if
+# get_available_bytes() == 0 means we cant read no more
 class AsepriteFileReader extends RefCounted:
 	var stream: Variant = null
 
@@ -1358,15 +1159,58 @@ class AsepriteFileReader extends RefCounted:
 		if stream is FileAccess: stream.close()
 		stream = null
 
-	func skip(bytes: int) -> void:
-		if stream is FileAccess: stream.seek(stream.get_position() + bytes)
-		elif stream is StreamPeerBuffer: stream.seek(stream.get_position() + bytes)
+	func get_available_bytes() -> int:
+		if stream is FileAccess: return stream.get_length() - stream.get_position()
+		if stream is StreamPeer: return stream.get_available_bytes()
+		return 0
+
+	# Skip `bytes`, return the amount of bytes skipped.
+	# If the stream is at the end, it will return 0.
+	func skip(bytes: int) -> int:
+		# Sanity check, just ignore zero and negative values
+		if bytes <= 0: return 0
+
+		if stream is FileAccess:
+			var len: int = stream.get_length()
+			var pos: int = stream.get_position()
+
+			# We cant read past the end of the stream
+			if pos + bytes > len:
+				bytes = len - pos
+				if bytes <= 0: return 0
+
+			stream.seek(pos + bytes)
+			return bytes
+
+		elif stream is StreamPeerBuffer:
+			var len: int = stream.data_array.size()
+			var pos: int = stream.get_position()
+
+			# We cant read past the end of the stream
+			if pos + bytes > len:
+				bytes = len - pos
+				if bytes <= 0: return 0
+
+			stream.seek(pos + bytes)
+			return bytes
 
 		# StreamPeer might read from the network, we cant just move forward
 		elif stream is StreamPeer:
-			for i in range(bytes):
-				if stream.get_available_bytes() > 0: stream.get_8()
-				else: break
+			var index := 0
+
+			# I miss the regular old-school for loops...
+			for _i in range(bytes):
+				# If get_available_bytes is 0, we are at the end of the stream
+				# I suspect some future StreamPeer might return 0 even tho there are bytes available
+				if stream.get_available_bytes() == 0:
+					return index
+
+				stream.get_8()
+				index += 1
+
+			return index
+
+		return 0
 
 	## An 8-bit unsigned integer value
 	func get_byte() -> int:

@@ -75,7 +75,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 		var tileset := ase_file.tilesets[layer.tileset_index]
 
-		var canvas := ase_file.frames[0].get_image(layer_index)
+		var canvas := ase_file.get_layer_frame_image(layer_index, 0)
 
 		var texture := PortableCompressedTexture2D.new()
 		texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
