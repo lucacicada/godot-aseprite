@@ -18,15 +18,17 @@ In the future, a warning message will be printed.
 
 ## Security note
 
+Be careful using this parser for untrusted files, especially if you plan to use it for network shared resources.
+
+The .aseprite format can be used to store filenames, potentially leaking personal info.
+
+A malicious file could also contain a large amount of transparent pixels, when uncompressed, it could take a lot of memory.
+Transparent pixels can be compressed efficiently, the raw data is `w * h * color_depth`, on very large image dimensions, this could lead to the uncompressed data being very large.
+
 ~~This parser is vulnerable to gzip bombs as `decompress_dynamic` calls are unbounded (`-1`).~~
 
 ~~The compression format used by Aseprite is ZLIB; it does not store the uncompressed size of the deflated buffer. Without this information, it is not possible to know at runtime how large the uncompressed buffer will be.~~
 
 ~~A heuristic could be implemented to limit this class of attacks, `compressed_size * 5.7` is a good estimate, exceeding an order of magnitude is likely a malformed file. A compression rate of `10:1` is extreme for images.~~
 
-Edit: it turns out I already contradicted myself in the code, there is already a check in place for the uncompressed size of the buffer against the expected size.
-
-Be careful using this parser for untrusted files, especially if you plan to use it for
-network shared resources.
-
-In addition, the .aseprite format can be used to store filenames, potentially leaking personal info.
+Edit: This parser is **NOT** vulnerable to gzip bombs, it turns out I already contradicted myself in the code, the `decompress_dynamic` call has been replaced with `decompress` with the appropriate expected size.
