@@ -295,7 +295,7 @@ func open(path: String) -> int:
 						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 26)
 
 						# ZLIB compressed buffer
-						cel.buffer = cel.buffer.decompress_dynamic(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
 						# Cel buffer size mismatch
 						if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
@@ -314,7 +314,7 @@ func open(path: String) -> int:
 						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 54)
 
 						# ZLIB compressed buffer
-						cel.buffer = cel.buffer.decompress_dynamic(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
 						# Cel buffer size mismatch
 						if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
@@ -444,7 +444,7 @@ func open(path: String) -> int:
 						tileset.buffer = _reader.get_buffer(data_len)
 
 						# ZLIB compressed buffer
-						tileset.buffer = tileset.buffer.decompress_dynamic(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+						tileset.buffer = tileset.buffer.decompress(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
 						# Cel buffer size mismatch
 						if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:

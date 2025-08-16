@@ -26,8 +26,6 @@ In the future, a warning message will be printed.
 
 Edit: it turns out I already contradicted myself in the code, there is already a check in place for the uncompressed size of the buffer against the expected size.
 
-Each call to `decompress_dynamic` will never exceed the expected size of the uncompressed buffer.
-
 Be careful using this parser for untrusted files, especially if you plan to use it for
 network shared resources.
 
