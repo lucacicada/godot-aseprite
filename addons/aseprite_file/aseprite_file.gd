@@ -96,11 +96,6 @@ var grid_width: int = 0
 ## Grid height (zero if there is no grid)
 var grid_height: int = 0
 
-## The palette used in the sprite.
-var palette: Palette = Palette.new()
-
-var color_profile: ColorProfile = ColorProfile.new()
-
 ## Frames in the sprite.
 var frames: Array[Frame] = []
 
@@ -109,6 +104,59 @@ var layers: Array[Layer] = []
 
 ## A tileset is a collection of individual tiles, arranged in a grid.
 var tilesets: Array[Tileset] = []
+
+## The palette used in the sprite.
+var palette: Palette = Palette.new()
+
+## The color profile used in the sprite.
+var color_profile: ColorProfile = ColorProfile.new()
+
+# func get_frames() -> Array[Frame]:
+# 	return self.frames.duplicate()
+
+# func get_chunks() -> Array[Chunk]:
+# 	var items: Array[Chunk] = []
+
+# 	for frame in self.frames:
+# 		items.append_array(frame.chunks)
+
+# 	return items
+
+# func get_layers() -> Array[Layer]:
+# 	var items: Array[Layer] = []
+
+# 	for frame in self.frames:
+# 		for chunk in frame.chunks:
+# 			if chunk is AsepriteFile.Layer:
+# 				items.append(chunk)
+
+# 	return items
+
+# func get_tilesets() -> Array[Tileset]:
+# 	var items: Array[Tileset] = []
+
+# 	for frame in self.frames:
+# 		for chunk in frame.chunks:
+# 			if chunk is AsepriteFile.Tileset:
+# 				items.append(chunk)
+
+# 	return items
+
+# func get_palette() -> Palette:
+# 	for frame in self.frames:
+# 		for chunk in frame.chunks:
+# 			if chunk is AsepriteFile.Palette:
+# 				return chunk
+
+# 	return Palette.new()
+
+# func get_color_profile() -> ColorProfile:
+# 	for frame in self.frames:
+# 		for chunk in frame.chunks:
+# 			if chunk is AsepriteFile.ColorProfile:
+# 				return chunk
+
+# 	return ColorProfile.new()
 
 var _reader: AsepriteFileReader = null
 
@@ -133,7 +181,8 @@ func open(path: String) -> int:
 	self._reader = AsepriteFileReader.new()
 	self._reader.open(fs)
 
-	# Read the header
+	# region Read the header
+
 	self.file_size = _reader.get_dword()
 
 	# Check the magic number
@@ -162,6 +211,8 @@ func open(path: String) -> int:
 	self.grid_height = _reader.get_word()
 	_reader.skip(84)
 
+	# endregion
+
 	# Sanity check for header size
 	if fs.get_position() != 128: return ERR_FILE_EOF
 
@@ -170,7 +221,8 @@ func open(path: String) -> int:
 		var frame := Frame.new()
 		self.frames.append(frame)
 
-		# Read the frame header
+		# region Read the frame header
+
 		frame.frame_size = _reader.get_dword()
 
 		# Aseprite - Invalid frame magic number
@@ -181,24 +233,25 @@ func open(path: String) -> int:
 		_reader.skip(2) # For future (set to zero)
 		frame.chunks_num_new = _reader.get_dword()
 
+		# endregion
+
 		# Per spec, use old chunks count if new chunks count is zero
 		var chunks_num := frame.chunks_num_old if frame.chunks_num_new == 0 else frame.chunks_num_new
 
 		# Read each chunk in the frame
 		for chunk_index in range(chunks_num):
-			var ase_chunk := Chunk.new()
-			frame.chunks.append(ase_chunk)
-
 			# Read the chunk header
+			var current_chunk_size := _reader.get_dword()
+			var current_chunk_type := _reader.get_word()
 
-			ase_chunk._position = fs.get_position()
-			ase_chunk.chunk_size = _reader.get_dword()
-			ase_chunk.chunk_type = _reader.get_word()
-
-			match ase_chunk.chunk_type:
+			match current_chunk_type:
 				# Layer Chunk
 				0x2004:
 					var layer := Layer.new()
+					frame.chunks.append(layer)
+					layer.chunk_size = current_chunk_size
+					layer.chunk_type = current_chunk_type
+
 					self.layers.append(layer)
 
 					# Read the layer data
@@ -232,6 +285,10 @@ func open(path: String) -> int:
 				# Cel Chunk
 				0x2005:
 					var cel := Cel.new()
+					frame.chunks.append(cel)
+					cel.chunk_size = current_chunk_size
+					cel.chunk_type = current_chunk_type
+
 					frame.cels.append(cel)
 
 					# Read the cel data
@@ -278,11 +335,10 @@ func open(path: String) -> int:
 						cel.w = _reader.get_word()
 						cel.h = _reader.get_word()
 
-						var buf = fs.get_buffer(ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position))
-						cel.buffer = buf
+						cel.buffer = _reader.get_buffer(current_chunk_size - 26)
 
 						# Aseprite - Cel buffer size mismatch
-						if buf.size() != cel.w * cel.h * (self.color_depth / 8):
+						if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
 							return ERR_FILE_CORRUPT
 
 					elif cel.type == 1:
@@ -292,7 +348,7 @@ func open(path: String) -> int:
 						cel.w = _reader.get_word()
 						cel.h = _reader.get_word()
 
-						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 26)
+						cel.buffer = _reader.get_buffer(current_chunk_size - 26)
 
 						# ZLIB compressed buffer
 						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
@@ -311,7 +367,7 @@ func open(path: String) -> int:
 						cel.bitmask_for_90cw_rotation = _reader.get_dword()
 						_reader.skip(10) # Skip 10 bytes for reserved
 
-						cel.buffer = _reader.get_buffer(ase_chunk.chunk_size - 54)
+						cel.buffer = _reader.get_buffer(current_chunk_size - 54)
 
 						# ZLIB compressed buffer
 						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
@@ -323,6 +379,9 @@ func open(path: String) -> int:
 				# Cel Extra Chunk (0x2006)
 				0x2006:
 					var cel_extra := CelExtra.new()
+					frame.chunks.append(cel_extra)
+					cel_extra.chunk_size = current_chunk_size
+					cel_extra.chunk_type = current_chunk_type
 
 					# Adds extra information to the latest read cel.
 
@@ -343,10 +402,13 @@ func open(path: String) -> int:
 
 					frame.cels[frame.cels.size() - 1].extra = cel_extra
 
-
 				# Color Profile Chunk
 				0x2007:
 					self.color_profile = ColorProfile.new()
+					frame.chunks.append(self.color_profile)
+					self.color_profile.chunk_size = current_chunk_size
+					self.color_profile.chunk_type = current_chunk_type
+
 					#   Color profile for RGB or grayscale values.
 
 					# WORD        Type
@@ -372,16 +434,14 @@ func open(path: String) -> int:
 
 					if self.color_profile.type == 2:
 						var icc_data_len := _reader.get_dword()
-
-						# Aseprite - Color profile data size mismatch
-						if icc_data_len != ase_chunk.chunk_size - (fs.get_position() - ase_chunk._position):
-							return ERR_FILE_CORRUPT
-
 						self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
 
 				# Palette Chunk
 				0x2019:
 					self.palette = Palette.new()
+					frame.chunks.append(self.palette)
+					self.palette.chunk_size = current_chunk_size
+					self.palette.chunk_type = current_chunk_type
 
 					# Read the palette header
 
@@ -423,6 +483,10 @@ func open(path: String) -> int:
 				# Tileset Chunk
 				0x2023:
 					var tileset := Tileset.new()
+					frame.chunks.append(tileset)
+					tileset.chunk_size = current_chunk_size
+					tileset.chunk_type = current_chunk_type
+
 					self.tilesets.append(tileset)
 
 					tileset.id = _reader.get_dword()
@@ -452,23 +516,12 @@ func open(path: String) -> int:
 
 				_:
 					# Ignore unsupported chunk types
-					_reader.skip(ase_chunk.chunk_size - 6)
+					_reader.skip(current_chunk_size - 6)
 
-			# Sanity check, make sure we have read the entire chunk
-			if fs.get_position() != ase_chunk._position + ase_chunk.chunk_size:
-				return ERR_FILE_EOF
-
-		# Sanity check, this should never happen
-		if chunks_num != frame.chunks.size():
-			return ERR_FILE_CORRUPT
-
-		# # Sanity check, make sure we have read the entire frame
-		# if fs.get_position() != frame._position + frame.frame_size:
-		# 	return ERR_FILE_EOF
-
-	# Sanity check, this should never happen
-	if self.num_frames != self.frames.size():
-		return ERR_FILE_CORRUPT
+					var unknown_chunk := UnknownChunk.new()
+					frame.chunks.append(unknown_chunk)
+					unknown_chunk.chunk_size = current_chunk_size
+					unknown_chunk.chunk_type = current_chunk_type
 
 	# Sanity check, make sure we have read the entire file
 	if fs.get_position() != self.file_size:
@@ -789,6 +842,7 @@ static func create_raw_image_from_data(width: int, height: int, color_depth: int
 		data,
 	)
 
+## Represent a single frame.
 class Frame extends RefCounted:
 	## Bytes in this frame
 	var frame_size: int = 0
@@ -814,10 +868,8 @@ class Frame extends RefCounted:
 		# Per spec, use old chunks count if new chunks count is zero
 		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
 
+## Base class for all chunks.
 class Chunk extends RefCounted:
-	## Position in bytes of this chunk in the original source stream.
-	var _position: int = -1
-
 	var chunk_size: int = 0
 
 	## Chunk type
@@ -838,7 +890,7 @@ class Chunk extends RefCounted:
 	var chunk_type: int = 0
 
 ## 0x2019
-class Palette extends RefCounted:
+class Palette extends Chunk:
 	var palette_size: int = 0
 	var first_color: int = 0
 	var last_color: int = 0
@@ -867,7 +919,7 @@ class PaletteColor extends RefCounted:
 	var name: String = ""
 
 ## 0x2004
-class Layer extends RefCounted:
+class Layer extends Chunk:
 	## Layer flags
     ## 1 = Visible
     ## 2 = Editable
@@ -930,7 +982,7 @@ class Layer extends RefCounted:
 		return not self.is_visible()
 
 ## 0x2005
-class Cel extends RefCounted:
+class Cel extends Chunk:
 	## Layer index
 	var layer_index: int
 
@@ -972,7 +1024,8 @@ class Cel extends RefCounted:
 
 	var extra: CelExtra = null
 
-class CelExtra extends RefCounted:
+## 0x2006
+class CelExtra extends Chunk:
 	var flags: int = 0
 
 	var precise_x: float = 0.0
@@ -981,7 +1034,7 @@ class CelExtra extends RefCounted:
 	var height: float = 0.0
 
 ## 0x2007
-class ColorProfile extends RefCounted:
+class ColorProfile extends Chunk:
 	## Color profile type
 	## 0 - no color profile (as in old .aseprite files)
 	## 1 - use sRGB
@@ -996,7 +1049,7 @@ class ColorProfile extends RefCounted:
 	var icc_data: PackedByteArray = []
 
 ## 0x2023
-class Tileset extends RefCounted:
+class Tileset extends Chunk:
 	var id: int = 0
 
 	#   1 - Include link to external file
@@ -1020,6 +1073,9 @@ class Tileset extends RefCounted:
 	var external_file_id: int = -1
 	var external_id: int = -1
 	var buffer: PackedByteArray = []
+
+class UnknownChunk extends Chunk:
+	pass
 
 # FileAccess does not extend StreamPeer...
 # Additionally, get_xxx() do not return an error if the stream is empty
