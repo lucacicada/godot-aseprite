@@ -40,6 +40,8 @@ const CEL_TYPE_LINKED: int = 1
 const CEL_TYPE_COMPRESSED_CEL: int = 2
 const CEL_TYPE_COMPRESSED_TILEMAP: int = 3
 
+const OPEN_FLAG_SKIP_BUFFER: int = 1 << 0
+
 ## Size of the file in bytes
 var file_size: int = -1
 
@@ -162,7 +164,7 @@ var _reader: AsepriteFileReader = null
 
 ## Opens the Aseprite file for reading.
 ## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
-func open(path: String) -> int:
+func open(path: String, flags: int = 0) -> int:
 	# Do not allow to re-open the file
 	if _reader: return ERR_ALREADY_IN_USE
 
@@ -335,11 +337,13 @@ func open(path: String) -> int:
 						cel.w = _reader.get_word()
 						cel.h = _reader.get_word()
 
-						cel.buffer = _reader.get_buffer(current_chunk_size - 26)
+						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
+							# 26 is the number of bytes in the header we have just read
+							cel.buffer = _reader.get_buffer(current_chunk_size - 26)
 
-						# Aseprite - Cel buffer size mismatch
-						if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
-							return ERR_FILE_CORRUPT
+							# Aseprite - Cel buffer size mismatch
+							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
+								return ERR_FILE_CORRUPT
 
 					elif cel.type == 1:
 						cel.link = _reader.get_word()
@@ -348,14 +352,16 @@ func open(path: String) -> int:
 						cel.w = _reader.get_word()
 						cel.h = _reader.get_word()
 
-						cel.buffer = _reader.get_buffer(current_chunk_size - 26)
+						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
+							# 26 is the number of bytes in the header we have just read
+							cel.buffer = _reader.get_buffer(current_chunk_size - 26)
 
-						# ZLIB compressed buffer
-						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+							# ZLIB compressed buffer
+							cel.buffer = cel.buffer.decompress(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Cel buffer size mismatch
-						if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
-							return ERR_FILE_CORRUPT
+							# Cel buffer size mismatch
+							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
+								return ERR_FILE_CORRUPT
 
 					elif cel.type == 3:
 						cel.w = _reader.get_word()
@@ -367,14 +373,16 @@ func open(path: String) -> int:
 						cel.bitmask_for_90cw_rotation = _reader.get_dword()
 						_reader.skip(10) # Skip 10 bytes for reserved
 
-						cel.buffer = _reader.get_buffer(current_chunk_size - 54)
+						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
+							# 54 is the number of bytes in the header we have just read
+							cel.buffer = _reader.get_buffer(current_chunk_size - 54)
 
-						# ZLIB compressed buffer
-						cel.buffer = cel.buffer.decompress(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+							# ZLIB compressed buffer
+							cel.buffer = cel.buffer.decompress(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Cel buffer size mismatch
-						if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
-							return ERR_FILE_CORRUPT
+							# Cel buffer size mismatch
+							if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
+								return ERR_FILE_CORRUPT
 
 				# Cel Extra Chunk (0x2006)
 				0x2006:
@@ -434,7 +442,9 @@ func open(path: String) -> int:
 
 					if self.color_profile.type == 2:
 						var icc_data_len := _reader.get_dword()
-						self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
+
+						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
+							self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
 
 				# Palette Chunk
 				0x2019:
@@ -505,14 +515,15 @@ func open(path: String) -> int:
 					if tileset.flags & 2 != 0:
 						var data_len := _reader.get_dword()
 
-						tileset.buffer = _reader.get_buffer(data_len)
+						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
+							tileset.buffer = _reader.get_buffer(data_len)
 
-						# ZLIB compressed buffer
-						tileset.buffer = tileset.buffer.decompress(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
+							# ZLIB compressed buffer
+							tileset.buffer = tileset.buffer.decompress(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
-						# Cel buffer size mismatch
-						if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
-							return ERR_FILE_CORRUPT
+							# Cel buffer size mismatch
+							if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
+								return ERR_FILE_CORRUPT
 
 				_:
 					# Ignore unsupported chunk types
@@ -1079,8 +1090,8 @@ class UnknownChunk extends Chunk:
 
 # FileAccess does not extend StreamPeer...
 # Additionally, get_xxx() do not return an error if the stream is empty
-# we are supposed to check get_available_bytes() first however i am unusre if
-# get_available_bytes() == 0 means we cant read no more
+# we are supposed to check get_available_bytes() first
+# however i am unusre if get_available_bytes() == 0 means we cant read no more
 class AsepriteFileReader extends RefCounted:
 	var _stream: Variant = null
 
@@ -1221,6 +1232,7 @@ class AsepriteFileReader extends RefCounted:
 
 	func get_buffer(length: int) -> PackedByteArray:
 		if _stream is FileAccess: return _stream.get_buffer(length)
+		# TODO: [0] is error, [1] is data, return the error also
 		if _stream is StreamPeer: return _stream.get_data(length)[1]
 		return PackedByteArray()
 
@@ -1268,7 +1280,6 @@ class AsepriteFileReader extends RefCounted:
 			hex += "%02x" % buf[i]
 
 		return hex
-
 
 	func read_header():
 		## Header
@@ -1331,7 +1342,6 @@ class AsepriteFileReader extends RefCounted:
 		var grid_width := self.get_word()
 		var grid_height := self.get_word()
 		self.skip(84)
-
 
 	func read_frame():
 		# After the header come the "frames" data. Each frame has this little
