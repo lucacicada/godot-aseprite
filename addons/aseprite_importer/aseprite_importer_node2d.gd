@@ -35,12 +35,8 @@ func _get_preset_count() -> int:
 func _get_preset_name(preset_index: int) -> String:
 	return presets[preset_index]["name"]
 
-func _get_import_options(path: String, preset_index: int) -> Array:
-	var ase_file := AsepriteFile.new()
-	var err := ase_file.open(path, AsepriteFile.OPEN_FLAG_SKIP_BUFFER)
-	if err != OK: return []
-
-	var options := [
+func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
+	var options: Array[Dictionary] = [
 		{
 			"name": "root_node/name",
 			"default_value": "Node2D",
@@ -53,11 +49,18 @@ func _get_import_options(path: String, preset_index: int) -> Array:
 		},
 		{
 			"name": "sprite/offset",
-			"default_value": 0,
+			"default_value": 4,
 			"property_hint": PROPERTY_HINT_ENUM,
 			"hint_string": "Bottom Left:0,Bottom Right:1,Top Left:2,Top Right:3,Center:4",
 		}
 	]
+
+	var ase_file := AsepriteFile.new()
+	var err := ase_file.open(path, AsepriteFile.OPEN_FLAG_SKIP_BUFFER)
+	if err != OK:
+		ase_file.close()
+		push_warning("Aseprite - Failed to inspect file: %s" % error_string(err))
+		return []
 
 	var stack: Array[String] = []
 
@@ -68,24 +71,25 @@ func _get_import_options(path: String, preset_index: int) -> Array:
 		while stack.size() > level:
 			stack.pop_back()
 
-		if layer.type != AsepriteFile.LAYER_TYPE_GROUP:
-			var path_parts := ["layers"] + stack + ["%s_(#%s)" % [_normalize_layer_name(layer.name), layer_index]]
-			var option_base_name := "/".join(path_parts)
+		var seg := "%s_(#%s)" % [_normalize_layer_name(layer.name), layer_index]
+		var base_name := "/".join(["layers"] + stack + [seg])
+		stack.append(seg)
 
-			options.append_array([
-				{
-					"name": option_base_name + "/visible",
-					"default_value": layer.is_visible(),
-					"_layer_index": layer_index,
-				},
-				{
-					"name": option_base_name + "/export_path",
-					"default_value": "",
-					"property_hint": PROPERTY_HINT_SAVE_FILE,
-				}
-			])
+		if layer.type != AsepriteFile.LAYER_TYPE_NORMAL:
+			continue
 
-		stack.append("%s_(#%s)" % [_normalize_layer_name(layer.name), layer_index])
+		options.append_array([
+			{
+				"name": base_name + "/visible",
+				"default_value": layer.is_visible(),
+				"_layer_index": layer_index,
+			},
+			{
+				"name": base_name + "/export_path",
+				"default_value": "",
+				"property_hint": PROPERTY_HINT_SAVE_FILE,
+			}
+		])
 
 	return options
 
@@ -106,7 +110,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	var options_transform_anchor := options.get("sprite/offset", 0)
 
 	var node2d := Node2D.new()
-	node2d.name = options.get("root_node/name", "Node2D")
+	node2d.name = options.get("root_node/name", "Node2D").validate_node_name()
 	node2d.set_script(load(options.get("root_node/script", "")) if options.get("root_node/script", "") != "" else null)
 
 	if err != OK:
@@ -126,7 +130,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		var sprite := Sprite2D.new()
 		node2d.add_child(sprite)
 		sprite.owner = node2d
-		sprite.name = layer.name
+		sprite.name = layer.name.validate_node_name()
 
 		match options_transform_anchor:
 			0: # Bottom Left
@@ -190,4 +194,4 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	return err
 
 static func _normalize_layer_name(name: String) -> String:
-	return name.replace(" ", "_").replace("/", "_").replace("\\", "_").to_lower()
+	return name.validate_node_name().replace(" ", "_").replace("/", "_").replace("\\", "_").to_lower()
