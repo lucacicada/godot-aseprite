@@ -10,7 +10,16 @@ if err != OK:
     return
 ```
 
-Print all layers name
+Get an image for a specific layer, to get the first frame, pass 0 as the frame index
+
+```gdscript
+var layer_index := 0
+var frame_index := 0
+var image := ase_file.get_layer_frame_image(layer_index, frame_index)
+image.save_png("res://path/to/save/image.png")
+```
+
+Print all layer names
 
 ```gdscript
 for layer in ase_file.layers:

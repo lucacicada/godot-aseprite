@@ -891,6 +891,13 @@ class Frame extends RefCounted:
 
 ## Base class for all chunks.
 class Chunk extends RefCounted:
+	const TYPE_LAYER_CHUNK: int = 0x2004
+	const TYPE_CEL_CHUNK: int = 0x2005
+	const TYPE_CEL_EXTRA_CHUNK: int = 0x2006
+	const TYPE_COLOR_PROFILE_CHUNK: int = 0x2007
+	const TYPE_PALETTE_CHUNK: int = 0x2019
+	const TYPE_TILESET_CHUNK: int = 0x2023
+
 	var chunk_size: int = 0
 
 	## Chunk type
@@ -919,7 +926,15 @@ class Palette extends Chunk:
 	## Palette colors
 	var colors: Array[PaletteColor] = []
 
+	func get_first_color() -> PaletteColor:
+		return self.colors[self.first_color] if self.colors.size() > self.first_color else null
+
+	func get_last_color() -> PaletteColor:
+		return self.colors[self.last_color] if self.colors.size() > self.last_color else null
+
 class PaletteColor extends RefCounted:
+	const FLAG_HAS_NAME: int = 1
+
 	## Color flags
 	## 1 = Has Name
 	var flags: int = 0
@@ -938,6 +953,18 @@ class PaletteColor extends RefCounted:
 
 	## Color name (if flags & 1)
 	var name: String = ""
+
+	func has_name() -> bool:
+		return (self.flags & FLAG_HAS_NAME) != 0
+
+	## Convert to Godot Color
+	func to_color() -> Color:
+		return Color(
+			float(self.red) / 255.0,
+			float(self.green) / 255.0,
+			float(self.blue) / 255.0,
+			float(self.alpha) / 255.0,
+		)
 
 ## 0x2004
 class Layer extends Chunk:
@@ -1050,27 +1077,50 @@ class Cel extends Chunk:
 
 ## 0x2006
 class CelExtra extends Chunk:
+	const FLAG_PRECISE_BOUNDS: int = 1
+
+	## 1 = Precise bounds are set
 	var flags: int = 0
 
 	var precise_x: float = 0.0
 	var precise_y: float = 0.0
+
 	var width: float = 0.0
 	var height: float = 0.0
 
+	func has_precise_bounds() -> bool:
+		return (self.flags & FLAG_PRECISE_BOUNDS) != 0
+
 ## 0x2007
 class ColorProfile extends Chunk:
+	const TYPE_NO_PROFILE: int = 0
+	const TYPE_SRGB: int = 1
+	const TYPE_EMBEDDED_ICC: int = 2
+
+	const FLAG_USE_FIXED_GAMMA: int = 1
+
 	## Color profile type
 	## 0 - no color profile (as in old .aseprite files)
 	## 1 - use sRGB
 	## 2 - use the embedded ICC profile
 	var type: int = 0
 
+	## Flags
+	## 1 - use special fixed gamma
 	var flags: int = 0
 
+	## Fixed gamma (1.0 = linear)
+	## Note: The gamma in sRGB is 2.2 in overall but it doesn't use
+	## this fixed gamma, because sRGB uses different gamma sections
+	## (linear and non-linear). If sRGB is specified with a fixed
+	## gamma = 1.0, it means that this is Linear sRGB.
 	var fixed_gamma: float = 0.0
 
 	## ICC Color profile data
 	var icc_data: PackedByteArray = []
+
+	func has_fixed_gamma() -> bool:
+		return (self.flags & FLAG_USE_FIXED_GAMMA) != 0
 
 ## 0x2023
 class Tileset extends Chunk:
