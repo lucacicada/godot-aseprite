@@ -82,12 +82,12 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 			{
 				"name": base_name + "/visible",
 				"default_value": layer.is_visible(),
-				"_layer_index": layer_index,
 			},
 			{
 				"name": base_name + "/export_path",
 				"default_value": "",
 				"property_hint": PROPERTY_HINT_SAVE_FILE,
+				"hint_string": "*.png",
 			}
 		])
 
