@@ -344,6 +344,8 @@ func open(path: String, flags: int = 0) -> int:
 							# Aseprite - Cel buffer size mismatch
 							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
 								return ERR_FILE_CORRUPT
+						else:
+							_reader.skip(current_chunk_size - 26)
 
 					elif cel.type == 1:
 						cel.link = _reader.get_word()
@@ -362,6 +364,8 @@ func open(path: String, flags: int = 0) -> int:
 							# Cel buffer size mismatch
 							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
 								return ERR_FILE_CORRUPT
+						else:
+							_reader.skip(current_chunk_size - 26)
 
 					elif cel.type == 3:
 						cel.w = _reader.get_word()
@@ -383,6 +387,8 @@ func open(path: String, flags: int = 0) -> int:
 							# Cel buffer size mismatch
 							if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
 								return ERR_FILE_CORRUPT
+						else:
+							_reader.skip(current_chunk_size - 54)
 
 				# Cel Extra Chunk (0x2006)
 				0x2006:
@@ -445,6 +451,8 @@ func open(path: String, flags: int = 0) -> int:
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
 							self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
+						else:
+							_reader.skip(icc_data_len)
 
 				# Palette Chunk
 				0x2019:
@@ -524,6 +532,8 @@ func open(path: String, flags: int = 0) -> int:
 							# Cel buffer size mismatch
 							if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
 								return ERR_FILE_CORRUPT
+						else:
+							_reader.skip(data_len)
 
 				_:
 					# Ignore unsupported chunk types
@@ -991,6 +1001,9 @@ class Layer extends Chunk:
 
 	func is_hidden() -> bool:
 		return not self.is_visible()
+
+	func is_group() -> bool:
+		return self.type == 1
 
 ## 0x2005
 class Cel extends Chunk:
