@@ -1,7 +1,7 @@
 [remap]
 
-importer="aseprite.importer.portable_compressed_texture2d"
-type="PortableCompressedTexture2D"
+importer="aseprite.importer.texture2d"
+type="Texture2D"
 uid="uid://nx2etffne6x8"
 path="res://.godot/imported/single.aseprite-d6c88153e4c55f93a7ddb9c2fc52139a.res"
 
@@ -12,4 +12,4 @@ dest_files=["res://.godot/imported/single.aseprite-d6c88153e4c55f93a7ddb9c2fc521
 
 [params]
 
-layers/layer_1_(#0)=true
+external/path=""

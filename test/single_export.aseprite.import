@@ -1,0 +1,15 @@
+[remap]
+
+importer="aseprite.importer.texture2d"
+type="Texture2D"
+uid="uid://ci4ds4oo6rpey"
+path="res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae20e007b6dce.res"
+
+[deps]
+
+source_file="res://test/single_export.aseprite"
+dest_files=["res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae20e007b6dce.res"]
+
+[params]
+
+external/path="res://test/export.png"
