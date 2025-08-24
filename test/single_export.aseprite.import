@@ -12,4 +12,4 @@ dest_files=["res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae2
 
 [params]
 
-external/path="res://test/export.png"
+external/path="res://test/single_export.png"
