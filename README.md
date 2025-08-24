@@ -5,20 +5,32 @@
 Aseprite file parser for Godot Engine.
 
 ## Supported Chunks
-- [ ] Old palette chunk (0x0004)
-- [ ] Old palette chunk (0x0011)
 - [x] Layer Chunk (0x2004)
 - [x] Cel Chunk (0x2005)
 - [x] Cel Extra Chunk (0x2006)
 - [x] Color Profile Chunk (0x2007)
-- [ ] External Files Chunk (0x2008)
+- [x] External Files Chunk (0x2008)
 - [x] Tags Chunk (0x2018)
 - [x] Palette Chunk (0x2019)
 - [ ] User Data Chunk (0x2020)
 - [x] Slice Chunk (0x2022)
 - [x] Tileset Chunk (0x2023)
 
+### Legacy chunks
+
+After version v1.1 (Aug 2015), Aseprite introduced a new palette chunk (0x2019) that supports more than 256 colors.
+Legacy chunks are still saved for backward compatibility.
+https://blog.aseprite.org/2015/08/21/aseprite-v11-released/
+
+Legacy chunks are not supported to reduce complexity as practically they are not used anymore.
+
+- [ ] Old palette chunk (0x0004)
+- [ ] Old palette chunk (0x0011)
+
 ### Deprecated chunks
+
+Deprecated chunks are present in the spec but unused by Aseprite.
+
 - [ ] Mask Chunk (0x2016) DEPRECATED
 - [ ] Path Chunk (0x2017) Never used
 
