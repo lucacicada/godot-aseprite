@@ -583,14 +583,14 @@ func open(path: String, flags: int = 0) -> int:
 					#   + If has name bit in entry flags
 					#     STRING  Color name
 
-					palette_chunk.palette_size = _reader.get_dword()
+					palette_chunk.colors_count = _reader.get_dword()
 					palette_chunk.first_color = _reader.get_dword()
 					palette_chunk.last_color = _reader.get_dword()
 					_reader.skip(8) # Skip 8 bytes for future use
 
 					# Read the palette colors
 
-					for _palette_index in range(palette_chunk.palette_size):
+					for _palette_index in range(palette_chunk.colors_count):
 						var palette_color := PaletteColor.new()
 
 						palette_chunk.colors.append(palette_color)
@@ -700,7 +700,7 @@ func open(path: String, flags: int = 0) -> int:
 					# Ignore unsupported chunk types
 					_reader.skip(current_chunk_size - 6)
 
-					var unknown_chunk := UnknownChunk.new()
+					var unknown_chunk := UnsupportedChunk.new()
 
 					frame.chunks.append(unknown_chunk)
 
@@ -823,55 +823,12 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 
 		return canvas
 
-	# Godot expands 8-bit indexed images to 32-bit RGBA8
-	if self.color_depth == 8:
-		var rgba8_buf := PackedByteArray()
-		rgba8_buf.resize(cel.w * cel.h * 4)
-
-		for i in range(cel.buffer.size()):
-			var color_index := cel.buffer[i]
-
-			# TODO: handle palette index out of bounds
-			var color := self.palette.colors[color_index]
-
-			rgba8_buf[i * 4 + 0] = color.red
-			rgba8_buf[i * 4 + 1] = color.green
-			rgba8_buf[i * 4 + 2] = color.blue
-			rgba8_buf[i * 4 + 3] = color.alpha
-
-		return Image.create_from_data(
-			cel.w,
-			cel.h,
-			false,
-			Image.FORMAT_RGBA8,
-			rgba8_buf,
-		)
-
-	if self.color_depth == 16:
-		var img := Image.create_from_data(
-			cel.w,
-			cel.h,
-			false,
-			Image.FORMAT_LA8,
-			cel.buffer,
-		)
-
-		# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
-		# In grayscale, RGB channels are all set to the same value
-		# R = BYTE[0]
-		# G = BYTE[0]
-		# B = BYTE[0]
-		# A = BYTE[1]
-		img.convert(Image.FORMAT_RGBA8)
-
-		return img
-
-	return Image.create_from_data(
+	return create_image_from_data(
 		cel.w,
 		cel.h,
-		false,
-		Image.FORMAT_RGBA8,
-		cel.buffer,
+		self.color_depth,
+		self.palette,
+		cel.buffer
 	)
 
 func get_tile_image(tileset_index: int, tile_id: int) -> Image:
@@ -884,56 +841,12 @@ func get_tile_image(tileset_index: int, tile_id: int) -> Image:
 	var buffer_pos := tile_id * stride
 	var buf := tileset.buffer.slice(buffer_pos, buffer_pos + stride)
 
-
-	# Godot expands 8-bit indexed images to 32-bit RGBA8
-	if self.color_depth == 8:
-		var rgba8_buf := PackedByteArray()
-		rgba8_buf.resize(tileset.tile_width * tileset.tile_height * 4)
-
-		for i in range(buf.size()):
-			var color_index := buf[i]
-
-			# TODO: handle palette index out of bounds
-			var color := self.palette.colors[color_index]
-
-			rgba8_buf[i * 4 + 0] = color.red
-			rgba8_buf[i * 4 + 1] = color.green
-			rgba8_buf[i * 4 + 2] = color.blue
-			rgba8_buf[i * 4 + 3] = color.alpha
-
-		return Image.create_from_data(
-			tileset.tile_width,
-			tileset.tile_height,
-			false,
-			Image.FORMAT_RGBA8,
-			rgba8_buf,
-		)
-
-	if self.color_depth == 16:
-		var img := Image.create_from_data(
-			tileset.tile_width,
-			tileset.tile_height,
-			false,
-			Image.FORMAT_LA8,
-			buf,
-		)
-
-		# Godot correcly conver 16-bit grayscale images to 32-bit RGBA8 images
-		# In grayscale, RGB channels are all set to the same value
-		# R = BYTE[0]
-		# G = BYTE[0]
-		# B = BYTE[0]
-		# A = BYTE[1]
-		img.convert(Image.FORMAT_RGBA8)
-
-		return img
-
-	return Image.create_from_data(
-		self.tile_width,
-		self.tile_height,
-		false,
-		Image.FORMAT_RGBA8,
-		buf,
+	return create_image_from_data(
+		tileset.tile_width,
+		tileset.tile_height,
+		self.color_depth,
+		self.palette,
+		buf
 	)
 
 ## Return the image in the `Image.FORMAT_RGBA8` format.
@@ -1080,7 +993,7 @@ class Chunk extends RefCounted:
 
 ## 0x2019
 class Palette extends Chunk:
-	var palette_size: int = 0
+	var colors_count: int = 0
 	var first_color: int = 0
 	var last_color: int = 0
 
@@ -1416,7 +1329,7 @@ class Tileset extends Chunk:
 	var external_id: int = -1
 	var buffer: PackedByteArray = []
 
-class UnknownChunk extends Chunk:
+class UnsupportedChunk extends Chunk:
 	pass
 
 # FileAccess does not extend StreamPeer...
