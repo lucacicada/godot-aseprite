@@ -136,6 +136,8 @@ var palette: Palette = Palette.new()
 ## The color profile used in the sprite.
 var color_profile: ColorProfile = ColorProfile.new()
 
+var tags: Array[Tag] = []
+
 # func get_frames() -> Array[Frame]:
 # 	return self.frames.duplicate()
 
@@ -483,6 +485,57 @@ func open(path: String, flags: int = 0) -> int:
 							self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
 						else:
 							_reader.skip(icc_data_len)
+
+				# Tags Chunk
+				0x2018:
+					# WORD        Number of tags
+					# BYTE[8]     For future (set to zero)
+					# + For each tag
+					#   WORD      From frame
+					#   WORD      To frame
+					#   BYTE      Loop animation direction
+					#               0 = Forward
+					#               1 = Reverse
+					#               2 = Ping-pong
+					#               3 = Ping-pong Reverse
+					#   WORD      Repeat N times. Play this animation section N times:
+					#               0 = Doesn't specify (plays infinite in UI, once on export,
+					#                   for ping-pong it plays once in each direction)
+					#               1 = Plays once (for ping-pong, it plays just in one direction)
+					#               2 = Plays twice (for ping-pong, it plays once in one direction,
+					#                   and once in reverse)
+					#               n = Plays N times
+					#   BYTE[6]   For future (set to zero)
+					#   BYTE[3]   RGB values of the tag color
+					#               Deprecated, used only for backward compatibility with Aseprite v1.2.x
+					#               The color of the tag is the one in the user data field following
+					#               the tags chunk
+					#   BYTE      Extra byte (zero)
+					#   STRING    Tag name
+					var tags_chunk := Tags.new()
+
+					self.tags.append(tags_chunk)
+
+					tags_chunk.tags_count = _reader.get_word()
+					_reader.skip(8) # Skip 8 bytes for future use
+
+					for _tag_index in range(tags_chunk.tags_count):
+						var tag := Tag.new()
+
+						tags_chunk.tags.append(tag)
+
+						tag.from_frame = _reader.get_word()
+						tag.to_frame = _reader.get_word()
+						tag.loop_direction = _reader.get_byte()
+						tag.repeat = _reader.get_word()
+						_reader.skip(6) # Skip 6 bytes for future use
+						tag.color_r = _reader.get_byte()
+						tag.color_g = _reader.get_byte()
+						tag.color_b = _reader.get_byte()
+						_reader.skip(1) # Skip 1 byte for future use
+						tag.name = _reader.get_string()
+
+					pass
 
 				# Palette Chunk
 				0x2019:
@@ -1178,6 +1231,33 @@ class ColorProfile extends Chunk:
 
 	func has_fixed_gamma() -> bool:
 		return (self.flags & Flags.USE_FIXED_GAMMA) != 0
+
+## 0x2018
+class Tags extends Chunk:
+	var tags_count: int = 0
+	var tags: Array[Tag] = []
+
+class Tag:
+	enum LoopDirection {
+		FORWARD = 0,
+		REVERSE = 1,
+		PING_PONG = 2,
+		PING_PONG_REVERSE = 3,
+	}
+
+	var from_frame: int = 0
+	var to_frame: int = 0
+	var loop_direction: LoopDirection
+	var repeat: int = 0
+
+	## @deprecated
+	var color_r: int = 0
+	## @deprecated
+	var color_g: int = 0
+	## @deprecated
+	var color_b: int = 0
+
+	var name: String = ""
 
 ## 0x2023
 class Tileset extends Chunk:
