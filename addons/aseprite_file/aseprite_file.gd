@@ -474,6 +474,13 @@ func open(path: String, flags: int = 0) -> int:
 
 				# External Files Chunk
 				0x2008:
+					var external_files_chunk := ExternalFiles.new()
+
+					frame.chunks.append(external_files_chunk)
+
+					external_files_chunk.chunk_size = current_chunk_size
+					external_files_chunk.chunk_type = current_chunk_type
+
 					# DWORD       Number of entries
 					# BYTE[8]     Reserved (set to zero)
 					# + For each entry
@@ -485,12 +492,6 @@ func open(path: String, flags: int = 0) -> int:
 					#               3 - Extension name for tile management (can exist one per sprite)
 					#   BYTE[7]   Reserved (set to zero)
 					#   STRING    External file name or extension ID (see NOTE.4)
-					var external_files_chunk := ExternalFiles.new()
-
-					frame.chunks.append(external_files_chunk)
-
-					external_files_chunk.chunk_size = current_chunk_size
-					external_files_chunk.chunk_type = current_chunk_type
 
 					external_files_chunk.files_count = _reader.get_dword()
 					_reader.skip(8) # Skip 8 bytes for future use
@@ -507,6 +508,14 @@ func open(path: String, flags: int = 0) -> int:
 
 				# Tags Chunk
 				0x2018:
+					var tags_chunk := Tags.new()
+
+					self.tags.append(tags_chunk)
+					frame.chunks.append(tags_chunk)
+
+					tags_chunk.chunk_size = current_chunk_size
+					tags_chunk.chunk_type = current_chunk_type
+
 					# WORD        Number of tags
 					# BYTE[8]     For future (set to zero)
 					# + For each tag
@@ -531,13 +540,6 @@ func open(path: String, flags: int = 0) -> int:
 					#               the tags chunk
 					#   BYTE      Extra byte (zero)
 					#   STRING    Tag name
-					var tags_chunk := Tags.new()
-
-					self.tags.append(tags_chunk)
-					frame.chunks.append(tags_chunk)
-
-					tags_chunk.chunk_size = current_chunk_size
-					tags_chunk.chunk_type = current_chunk_type
 
 					tags_chunk.tags_count = _reader.get_word()
 					_reader.skip(8) # Skip 8 bytes for future use
@@ -567,8 +569,6 @@ func open(path: String, flags: int = 0) -> int:
 
 					palette_chunk.chunk_size = current_chunk_size
 					palette_chunk.chunk_type = current_chunk_type
-
-					# Read the palette header
 
 					# DWORD       New palette size (total number of entries)
 					# DWORD       First color index to change
@@ -606,6 +606,13 @@ func open(path: String, flags: int = 0) -> int:
 
 				# Slice Chunk
 				0x2022:
+					var slice_chunk := Slice.new()
+
+					frame.chunks.append(slice_chunk)
+
+					slice_chunk.chunk_size = current_chunk_size
+					slice_chunk.chunk_type = current_chunk_type
+
 					# DWORD       Number of "slice keys"
 					# DWORD       Flags
 					#               1 = It's a 9-patches slice
@@ -628,12 +635,6 @@ func open(path: String, flags: int = 0) -> int:
 					#   + If flags have bit 2
 					#     LONG    Pivot X position (relative to the slice origin)
 					#     LONG    Pivot Y position (relative to the slice origin)
-					var slice_chunk := Slice.new()
-
-					frame.chunks.append(slice_chunk)
-
-					slice_chunk.chunk_size = current_chunk_size
-					slice_chunk.chunk_type = current_chunk_type
 
 					slice_chunk.keys_count = _reader.get_dword()
 					slice_chunk.flags = _reader.get_dword()
@@ -1044,7 +1045,6 @@ class Frame extends RefCounted:
 	var chunks_num_new: int = 0
 
 	var chunks: Array[Chunk] = []
-
 	var cels: Array[Cel] = []
 
 	func get_chunks_count() -> int:
@@ -1123,12 +1123,7 @@ class PaletteColor extends RefCounted:
 
 	## Convert to Godot Color
 	func to_color() -> Color:
-		return Color(
-			float(self.red) / 255.0,
-			float(self.green) / 255.0,
-			float(self.blue) / 255.0,
-			float(self.alpha) / 255.0,
-		)
+		return Color8(self.red, self.green, self.blue, self.alpha)
 
 ## 0x2004
 class Layer extends Chunk:
@@ -1308,6 +1303,7 @@ class ColorProfile extends Chunk:
 ## 0x2008
 class ExternalFiles extends Chunk:
 	var files_count: int = 0
+
 	var files: Array[ExternalFile] = []
 
 class ExternalFile extends RefCounted:
@@ -1334,6 +1330,7 @@ class ExternalFile extends RefCounted:
 ## 0x2018
 class Tags extends Chunk:
 	var tags_count: int = 0
+
 	var tags: Array[Tag] = []
 
 class Tag extends RefCounted:
@@ -1584,24 +1581,28 @@ class AsepriteFileReader extends RefCounted:
 			self.get_long()
 		)
 
-	func get_pixel(color_depth: int) -> Color:
+	## Get pixel color as RGBA8, 0 to 255 range
+	## Indexed color (8-bit) returns [R, 0, 0, 255]
+	## Grayscale (16-bit) returns [V, V, V, A]
+	## RGBA (32-bit) returns [R, G, B, A]
+	func get_pixel(color_depth: int) -> Array[int]:
 		if color_depth == 8:
 			var r := self.get_byte()
-			return Color(r, 0, 0, 255)
+			return [r, 0, 0, 255]
 
 		if color_depth == 16:
 			var v := self.get_byte()
 			var a := self.get_byte()
-			return Color(v, v, v, a)
+			return [v, v, v, a]
 
 		if color_depth == 32:
 			var r := self.get_byte()
 			var g := self.get_byte()
 			var b := self.get_byte()
 			var a := self.get_byte()
-			return Color(r, g, b, a)
+			return [r, g, b, a]
 
-		return Color(0, 0, 0, 0)
+		return [0, 0, 0, 0]
 
 	func get_uuid() -> String:
 		var buf := self.get_buffer(16)
