@@ -514,6 +514,7 @@ func open(path: String, flags: int = 0) -> int:
 					#   STRING    Tag name
 					var tags_chunk := Tags.new()
 
+					frame.chunks.append(tags_chunk)
 					self.tags.append(tags_chunk)
 
 					tags_chunk.tags_count = _reader.get_word()
@@ -583,6 +584,60 @@ func open(path: String, flags: int = 0) -> int:
 							palette_color.name = _reader.get_string()
 
 					assert(self.palette.palette_size == self.palette.colors.size(), "Aseprite - Palette size mismatch: expected %d, got %d" % [self.palette.palette_size, self.palette.colors.size()])
+
+				# Slice Chunk
+				0x2022:
+					# DWORD       Number of "slice keys"
+					# DWORD       Flags
+					#               1 = It's a 9-patches slice
+					#               2 = Has pivot information
+					# DWORD       Reserved
+					# STRING      Name
+					# + For each slice key
+					#   DWORD     Frame number (this slice is valid from
+					#             this frame to the end of the animation)
+					#   LONG      Slice X origin coordinate in the sprite
+					#   LONG      Slice Y origin coordinate in the sprite
+					#   DWORD     Slice width (can be 0 if this slice hidden in the
+					#             animation from the given frame)
+					#   DWORD     Slice height
+					#   + If flags have bit 1
+					#     LONG    Center X position (relative to slice bounds)
+					#     LONG    Center Y position
+					#     DWORD   Center width
+					#     DWORD   Center height
+					#   + If flags have bit 2
+					#     LONG    Pivot X position (relative to the slice origin)
+					#     LONG    Pivot Y position (relative to the slice origin)
+					var slice := Slice.new()
+
+					frame.chunks.append(slice)
+
+					slice.keys_count = _reader.get_dword()
+					slice.flags = _reader.get_dword()
+					_reader.skip(4) # Skip 4 bytes for future use
+					slice.name = _reader.get_string()
+
+					for _key_index in range(slice.keys_count):
+						var key := SliceKey.new()
+
+						slice.keys.append(key)
+
+						key.frame_number = _reader.get_dword()
+						key.origin_x = _reader.get_long()
+						key.origin_y = _reader.get_long()
+						key.width = _reader.get_dword()
+						key.height = _reader.get_dword()
+
+						if slice.flags & 1 != 0:
+							key.center_x = _reader.get_long()
+							key.center_y = _reader.get_long()
+							key.center_width = _reader.get_dword()
+							key.center_height = _reader.get_dword()
+
+						if slice.flags & 2 != 0:
+							key.pivot_x = _reader.get_long()
+							key.pivot_y = _reader.get_long()
 
 				# Tileset Chunk
 				0x2023:
@@ -1237,7 +1292,7 @@ class Tags extends Chunk:
 	var tags_count: int = 0
 	var tags: Array[Tag] = []
 
-class Tag:
+class Tag extends RefCounted:
 	enum LoopDirection {
 		FORWARD = 0,
 		REVERSE = 1,
@@ -1258,6 +1313,29 @@ class Tag:
 	var color_b: int = 0
 
 	var name: String = ""
+
+## 0x2022
+class Slice extends Chunk:
+	var keys_count: int = 0
+	var flags: int = 0
+	var name: String = ""
+
+	var keys: Array[SliceKey] = []
+
+class SliceKey extends RefCounted:
+	var frame_number: int = 0
+	var x: int = 0
+	var y: int = 0
+	var width: int = 0
+	var height: int = 0
+
+	var center_x: int = 0
+	var center_y: int = 0
+	var center_width: int = 0
+	var center_height: int = 0
+
+	var pivot_x: int = 0
+	var pivot_y: int = 0
 
 ## 0x2023
 class Tileset extends Chunk:
