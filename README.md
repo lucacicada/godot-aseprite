@@ -4,7 +4,23 @@
 
 Aseprite file parser for Godot Engine.
 
-# Script
+## Supported Chunks
+- [ ] Old palette chunk (0x0004)
+- [ ] Old palette chunk (0x0011)
+- [x] Layer Chunk (0x2004)
+- [x] Cel Chunk (0x2005)
+- [x] Cel Extra Chunk (0x2006)
+- [x] Color Profile Chunk (0x2007)
+- [ ] External Files Chunk (0x2008)
+- [ ] Mask Chunk (0x2016) DEPRECATED
+- [ ] Path Chunk (0x2017) Never used
+- [x] Tags Chunk (0x2018)
+- [x] Palette Chunk (0x2019)
+- [ ] User Data Chunk (0x2020)
+- [x] Slice Chunk (0x2022)
+- [x] Tileset Chunk (0x2023)
+
+## Script
 
 The script is in a single GDScript file [addons/aseprite_file/aseprite_file.gd](addons/aseprite_file/aseprite_file.gd)
 
