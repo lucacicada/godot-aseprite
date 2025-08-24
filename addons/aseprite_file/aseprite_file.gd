@@ -274,16 +274,13 @@ func open(path: String, flags: int = 0) -> int:
 			match current_chunk_type:
 				# Layer Chunk
 				0x2004:
-					var layer := Layer.new()
+					var layer_chunk := Layer.new()
 
-					frame.chunks.append(layer)
-					self.layers.append(layer)
+					frame.chunks.append(layer_chunk)
+					self.layers.append(layer_chunk)
 
-					layer.chunk_size = current_chunk_size
-					layer.chunk_type = current_chunk_type
-
-
-					# Read the layer data
+					layer_chunk.chunk_size = current_chunk_size
+					layer_chunk.chunk_type = current_chunk_type
 
 					# WORD        Flags
 					# WORD        Layer type
@@ -299,29 +296,27 @@ func open(path: String, flags: int = 0) -> int:
 					# + If file header flags have bit 4:
 					#   UUID      Layer's universally unique identifier
 
-					layer.flags = _reader.get_word()
-					layer.type = _reader.get_word()
-					layer.child_level = _reader.get_word()
-					layer.default_width = _reader.get_word()
-					layer.default_height = _reader.get_word()
-					layer.blend_mode = _reader.get_word()
-					layer.opacity = _reader.get_byte()
+					layer_chunk.flags = _reader.get_word()
+					layer_chunk.type = _reader.get_word()
+					layer_chunk.child_level = _reader.get_word()
+					layer_chunk.default_width = _reader.get_word()
+					layer_chunk.default_height = _reader.get_word()
+					layer_chunk.blend_mode = _reader.get_word()
+					layer_chunk.opacity = _reader.get_byte()
 					_reader.skip(3) # Skip 3 bytes for future use
-					layer.name = _reader.get_string()
-					if layer.type == 2: layer.tileset_index = _reader.get_dword()
-					if layer.flags & 4: layer.uuid = _reader.get_uuid()
+					layer_chunk.name = _reader.get_string()
+					if layer_chunk.type == 2: layer_chunk.tileset_index = _reader.get_dword()
+					if layer_chunk.flags & 4: layer_chunk.uuid = _reader.get_uuid()
 
 				# Cel Chunk
 				0x2005:
-					var cel := Cel.new()
+					var cel_chunk := Cel.new()
 
-					frame.chunks.append(cel)
-					frame.cels.append(cel)
+					frame.chunks.append(cel_chunk)
+					frame.cels.append(cel_chunk)
 
-					cel.chunk_size = current_chunk_size
-					cel.chunk_type = current_chunk_type
-
-					# Read the cel data
+					cel_chunk.chunk_size = current_chunk_size
+					cel_chunk.chunk_type = current_chunk_type
 
 					# WORD        Layer index (see NOTE.2)
 					# SHORT       X position
@@ -353,79 +348,71 @@ func open(path: String, flags: int = 0) -> int:
 					#   TILE[]    Row by row, from top to bottom tile by tile
 					#             compressed with ZLIB method (see NOTE.3)
 
-					cel.layer_index = _reader.get_word()
-					cel.x = _reader.get_word()
-					cel.y = _reader.get_word()
-					cel.opacity = _reader.get_byte()
-					cel.type = _reader.get_word()
-					cel.z_index = _reader.get_word()
+					cel_chunk.layer_index = _reader.get_word()
+					cel_chunk.x = _reader.get_word()
+					cel_chunk.y = _reader.get_word()
+					cel_chunk.opacity = _reader.get_byte()
+					cel_chunk.type = _reader.get_word()
+					cel_chunk.z_index = _reader.get_word()
 					_reader.skip(5) # Skip 5 bytes for future use
 
-					if cel.type == 0:
-						cel.w = _reader.get_word()
-						cel.h = _reader.get_word()
+					if cel_chunk.type == 0:
+						cel_chunk.w = _reader.get_word()
+						cel_chunk.h = _reader.get_word()
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
 							# 26 is the number of bytes in the header we have just read
-							cel.buffer = _reader.get_buffer(current_chunk_size - 26)
+							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 26)
 
 							# Aseprite - Cel buffer size mismatch
-							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
+							if cel_chunk.buffer.size() != cel_chunk.w * cel_chunk.h * (self.color_depth / 8):
 								return ERR_FILE_CORRUPT
 						else:
 							_reader.skip(current_chunk_size - 26)
 
-					elif cel.type == 1:
-						cel.link = _reader.get_word()
+					elif cel_chunk.type == 1:
+						cel_chunk.link = _reader.get_word()
 
-					elif cel.type == 2:
-						cel.w = _reader.get_word()
-						cel.h = _reader.get_word()
+					elif cel_chunk.type == 2:
+						cel_chunk.w = _reader.get_word()
+						cel_chunk.h = _reader.get_word()
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
 							# 26 is the number of bytes in the header we have just read
-							cel.buffer = _reader.get_buffer(current_chunk_size - 26)
+							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 26)
 
 							# ZLIB compressed buffer
-							cel.buffer = cel.buffer.decompress(cel.w * cel.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-
-							# Cel buffer size mismatch
-							if cel.buffer.size() != cel.w * cel.h * (self.color_depth / 8):
-								return ERR_FILE_CORRUPT
+							cel_chunk.buffer = cel_chunk.buffer.decompress(cel_chunk.w * cel_chunk.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 						else:
 							_reader.skip(current_chunk_size - 26)
 
-					elif cel.type == 3:
-						cel.w = _reader.get_word()
-						cel.h = _reader.get_word()
-						cel.bits_per_tile = _reader.get_word()
-						cel.bitmask_for_tile_id = _reader.get_dword()
-						cel.bitmask_for_x_flip = _reader.get_dword()
-						cel.bitmask_for_y_flip = _reader.get_dword()
-						cel.bitmask_for_90cw_rotation = _reader.get_dword()
+					elif cel_chunk.type == 3:
+						cel_chunk.w = _reader.get_word()
+						cel_chunk.h = _reader.get_word()
+						cel_chunk.bits_per_tile = _reader.get_word()
+						cel_chunk.bitmask_for_tile_id = _reader.get_dword()
+						cel_chunk.bitmask_for_x_flip = _reader.get_dword()
+						cel_chunk.bitmask_for_y_flip = _reader.get_dword()
+						cel_chunk.bitmask_for_90cw_rotation = _reader.get_dword()
 						_reader.skip(10) # Skip 10 bytes for reserved
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
 							# 54 is the number of bytes in the header we have just read
-							cel.buffer = _reader.get_buffer(current_chunk_size - 54)
+							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 54)
 
 							# ZLIB compressed buffer
-							cel.buffer = cel.buffer.decompress(cel.w * cel.h * (cel.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-
-							# Cel buffer size mismatch
-							if cel.buffer.size() != cel.w * cel.h * (cel.bits_per_tile / 8):
-								return ERR_FILE_CORRUPT
+							cel_chunk.buffer = cel_chunk.buffer.decompress(cel_chunk.w * cel_chunk.h * (cel_chunk.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 						else:
 							_reader.skip(current_chunk_size - 54)
 
 				# Cel Extra Chunk (0x2006)
 				0x2006:
-					var cel_extra := CelExtra.new()
+					var cel_extra_chunk := CelExtra.new()
 
-					frame.chunks.append(cel_extra)
+					frame.chunks.append(cel_extra_chunk)
 
-					cel_extra.chunk_size = current_chunk_size
-					cel_extra.chunk_type = current_chunk_type
+					cel_extra_chunk.chunk_size = current_chunk_size
+					cel_extra_chunk.chunk_type = current_chunk_type
 
 					# Adds extra information to the latest read cel.
 
@@ -437,25 +424,24 @@ func open(path: String, flags: int = 0) -> int:
 					#     FIXED       Height of the cel in the sprite
 					#     BYTE[16]    For future use (set to zero)
 
-					cel_extra.flags = _reader.get_word()
-					cel_extra.precise_x = _reader.get_fixed()
-					cel_extra.precise_y = _reader.get_fixed()
-					cel_extra.width = _reader.get_fixed()
-					cel_extra.height = _reader.get_fixed()
+					cel_extra_chunk.flags = _reader.get_word()
+					cel_extra_chunk.precise_x = _reader.get_fixed()
+					cel_extra_chunk.precise_y = _reader.get_fixed()
+					cel_extra_chunk.width = _reader.get_fixed()
+					cel_extra_chunk.height = _reader.get_fixed()
 					_reader.skip(16) # Skip 16 bytes for future use
 
-					frame.cels[frame.cels.size() - 1].extra = cel_extra
+					frame.cels[frame.cels.size() - 1].extra = cel_extra_chunk
 
 				# Color Profile Chunk
 				0x2007:
-					self.color_profile = ColorProfile.new()
+					var color_profile_chunk := ColorProfile.new()
 
-					frame.chunks.append(self.color_profile)
+					self.color_profile = color_profile_chunk
+					frame.chunks.append(color_profile_chunk)
 
-					self.color_profile.chunk_size = current_chunk_size
-					self.color_profile.chunk_type = current_chunk_type
-
-					#   Color profile for RGB or grayscale values.
+					color_profile_chunk.chunk_size = current_chunk_size
+					color_profile_chunk.chunk_type = current_chunk_type
 
 					# WORD        Type
 					#               0 - no color profile (as in old .aseprite files)
@@ -473,18 +459,51 @@ func open(path: String, flags: int = 0) -> int:
 					#   DWORD     ICC profile data length
 					#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
 
-					self.color_profile.type = _reader.get_word()
-					self.color_profile.flags = _reader.get_word()
-					self.color_profile.fixed_gamma = _reader.get_fixed()
+					color_profile_chunk.type = _reader.get_word()
+					color_profile_chunk.flags = _reader.get_word()
+					color_profile_chunk.fixed_gamma = _reader.get_fixed()
 					_reader.skip(8)
 
-					if self.color_profile.type == 2:
+					if color_profile_chunk.type == 2:
 						var icc_data_len := _reader.get_dword()
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							self.color_profile.icc_data = _reader.get_buffer(icc_data_len)
+							color_profile_chunk.icc_data = _reader.get_buffer(icc_data_len)
 						else:
 							_reader.skip(icc_data_len)
+
+				# External Files Chunk
+				0x2008:
+					# DWORD       Number of entries
+					# BYTE[8]     Reserved (set to zero)
+					# + For each entry
+					#   DWORD     Entry ID (this ID is referenced by tilesets, palettes, or extended properties)
+					#   BYTE      Type
+					#               0 - External palette
+					#               1 - External tileset
+					#               2 - Extension name for properties
+					#               3 - Extension name for tile management (can exist one per sprite)
+					#   BYTE[7]   Reserved (set to zero)
+					#   STRING    External file name or extension ID (see NOTE.4)
+					var external_files_chunk := ExternalFiles.new()
+
+					frame.chunks.append(external_files_chunk)
+
+					external_files_chunk.chunk_size = current_chunk_size
+					external_files_chunk.chunk_type = current_chunk_type
+
+					external_files_chunk.files_count = _reader.get_dword()
+					_reader.skip(8) # Skip 8 bytes for future use
+
+					for _file_index in range(external_files_chunk.files_count):
+						var external_file := ExternalFile.new()
+
+						external_files_chunk.files.append(external_file)
+
+						external_file.id = _reader.get_dword()
+						external_file.type = _reader.get_byte()
+						_reader.skip(7) # Skip 7 bytes for future use
+						external_file.name = _reader.get_string()
 
 				# Tags Chunk
 				0x2018:
@@ -514,8 +533,11 @@ func open(path: String, flags: int = 0) -> int:
 					#   STRING    Tag name
 					var tags_chunk := Tags.new()
 
-					frame.chunks.append(tags_chunk)
 					self.tags.append(tags_chunk)
+					frame.chunks.append(tags_chunk)
+
+					tags_chunk.chunk_size = current_chunk_size
+					tags_chunk.chunk_type = current_chunk_type
 
 					tags_chunk.tags_count = _reader.get_word()
 					_reader.skip(8) # Skip 8 bytes for future use
@@ -536,16 +558,15 @@ func open(path: String, flags: int = 0) -> int:
 						_reader.skip(1) # Skip 1 byte for future use
 						tag.name = _reader.get_string()
 
-					pass
-
 				# Palette Chunk
 				0x2019:
-					self.palette = Palette.new()
+					var palette_chunk = Palette.new()
 
-					frame.chunks.append(self.palette)
+					self.palette = palette_chunk
+					frame.chunks.append(palette_chunk)
 
-					self.palette.chunk_size = current_chunk_size
-					self.palette.chunk_type = current_chunk_type
+					palette_chunk.chunk_size = current_chunk_size
+					palette_chunk.chunk_type = current_chunk_type
 
 					# Read the palette header
 
@@ -562,17 +583,17 @@ func open(path: String, flags: int = 0) -> int:
 					#   + If has name bit in entry flags
 					#     STRING  Color name
 
-					self.palette.palette_size = _reader.get_dword()
-					self.palette.first_color = _reader.get_dword()
-					self.palette.last_color = _reader.get_dword()
+					palette_chunk.palette_size = _reader.get_dword()
+					palette_chunk.first_color = _reader.get_dword()
+					palette_chunk.last_color = _reader.get_dword()
 					_reader.skip(8) # Skip 8 bytes for future use
 
 					# Read the palette colors
 
-					for _palette_index in range(self.palette.palette_size):
+					for _palette_index in range(palette_chunk.palette_size):
 						var palette_color := PaletteColor.new()
 
-						self.palette.colors.append(palette_color)
+						palette_chunk.colors.append(palette_color)
 
 						palette_color.flags = _reader.get_word()
 						palette_color.red = _reader.get_byte()
@@ -582,8 +603,6 @@ func open(path: String, flags: int = 0) -> int:
 
 						if palette_color.flags & PALETTE_COLOR_FLAG_HAS_NAME:
 							palette_color.name = _reader.get_string()
-
-					assert(self.palette.palette_size == self.palette.colors.size(), "Aseprite - Palette size mismatch: expected %d, got %d" % [self.palette.palette_size, self.palette.colors.size()])
 
 				# Slice Chunk
 				0x2022:
@@ -609,71 +628,70 @@ func open(path: String, flags: int = 0) -> int:
 					#   + If flags have bit 2
 					#     LONG    Pivot X position (relative to the slice origin)
 					#     LONG    Pivot Y position (relative to the slice origin)
-					var slice := Slice.new()
+					var slice_chunk := Slice.new()
 
-					frame.chunks.append(slice)
+					frame.chunks.append(slice_chunk)
 
-					slice.keys_count = _reader.get_dword()
-					slice.flags = _reader.get_dword()
+					slice_chunk.chunk_size = current_chunk_size
+					slice_chunk.chunk_type = current_chunk_type
+
+					slice_chunk.keys_count = _reader.get_dword()
+					slice_chunk.flags = _reader.get_dword()
 					_reader.skip(4) # Skip 4 bytes for future use
-					slice.name = _reader.get_string()
+					slice_chunk.name = _reader.get_string()
 
-					for _key_index in range(slice.keys_count):
-						var key := SliceKey.new()
+					for _key_index in range(slice_chunk.keys_count):
+						var slice_key := SliceKey.new()
 
-						slice.keys.append(key)
+						slice_chunk.keys.append(slice_key)
 
-						key.frame_number = _reader.get_dword()
-						key.origin_x = _reader.get_long()
-						key.origin_y = _reader.get_long()
-						key.width = _reader.get_dword()
-						key.height = _reader.get_dword()
+						slice_key.frame_number = _reader.get_dword()
+						slice_key.origin_x = _reader.get_long()
+						slice_key.origin_y = _reader.get_long()
+						slice_key.width = _reader.get_dword()
+						slice_key.height = _reader.get_dword()
 
-						if slice.flags & 1 != 0:
-							key.center_x = _reader.get_long()
-							key.center_y = _reader.get_long()
-							key.center_width = _reader.get_dword()
-							key.center_height = _reader.get_dword()
+						if slice_chunk.flags & 1 != 0:
+							slice_key.center_x = _reader.get_long()
+							slice_key.center_y = _reader.get_long()
+							slice_key.center_width = _reader.get_dword()
+							slice_key.center_height = _reader.get_dword()
 
-						if slice.flags & 2 != 0:
-							key.pivot_x = _reader.get_long()
-							key.pivot_y = _reader.get_long()
+						if slice_chunk.flags & 2 != 0:
+							slice_key.pivot_x = _reader.get_long()
+							slice_key.pivot_y = _reader.get_long()
 
 				# Tileset Chunk
 				0x2023:
-					var tileset := Tileset.new()
+					var tileset_chunk := Tileset.new()
 
-					frame.chunks.append(tileset)
-					self.tilesets.append(tileset)
+					frame.chunks.append(tileset_chunk)
+					self.tilesets.append(tileset_chunk)
 
-					tileset.chunk_size = current_chunk_size
-					tileset.chunk_type = current_chunk_type
+					tileset_chunk.chunk_size = current_chunk_size
+					tileset_chunk.chunk_type = current_chunk_type
 
-					tileset.id = _reader.get_dword()
-					tileset.flags = _reader.get_dword()
-					tileset.tiles_count = _reader.get_dword()
-					tileset.tile_width = _reader.get_word()
-					tileset.tile_height = _reader.get_word()
-					tileset.base_index = _reader.get_word()
+					tileset_chunk.id = _reader.get_dword()
+					tileset_chunk.flags = _reader.get_dword()
+					tileset_chunk.tiles_count = _reader.get_dword()
+					tileset_chunk.tile_width = _reader.get_word()
+					tileset_chunk.tile_height = _reader.get_word()
+					tileset_chunk.base_index = _reader.get_word()
 					_reader.skip(14)
-					tileset.name = _reader.get_string()
+					tileset_chunk.name = _reader.get_string()
 
-					if tileset.flags & 1 != 0:
-						tileset.external_file_id = _reader.get_word()
-						tileset.external_id = _reader.get_word()
+					if tileset_chunk.flags & 1 != 0:
+						tileset_chunk.external_file_id = _reader.get_word()
+						tileset_chunk.external_id = _reader.get_word()
 
-					if tileset.flags & 2 != 0:
+					if tileset_chunk.flags & 2 != 0:
 						var data_len := _reader.get_dword()
 
 						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							tileset.buffer = _reader.get_buffer(data_len)
+							tileset_chunk.buffer = _reader.get_buffer(data_len)
 
 							# ZLIB compressed buffer
-							tileset.buffer = tileset.buffer.decompress(tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-
-							# Cel buffer size mismatch
-							if tileset.buffer.size() != tileset.tile_width * tileset.tile_height * (self.color_depth / 8) * tileset.tiles_count:
-								return ERR_FILE_CORRUPT
+							tileset_chunk.buffer = tileset_chunk.buffer.decompress(tileset_chunk.tile_width * tileset_chunk.tile_height * (self.color_depth / 8) * tileset_chunk.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 						else:
 							_reader.skip(data_len)
 
@@ -1287,6 +1305,32 @@ class ColorProfile extends Chunk:
 	func has_fixed_gamma() -> bool:
 		return (self.flags & Flags.USE_FIXED_GAMMA) != 0
 
+## 0x2008
+class ExternalFiles extends Chunk:
+	var files_count: int = 0
+	var files: Array[ExternalFile] = []
+
+class ExternalFile extends RefCounted:
+	enum Type {
+		## External palette
+		EXTERNAL_PALETTE = 0,
+		## External tileset
+		EXTERNAL_TILESET = 1,
+		## Extension name for properties
+		EXTENSION_PROPERTIES = 2,
+		## Extension name for tile management (can exist one per sprite)
+		EXTENSION_TILE_MANAGEMENT = 3,
+	}
+
+	## Entry ID (this ID is referenced by tilesets, palettes, or extended properties)
+	var id: int = 0
+
+	## Type
+	var type: ExternalFile.Type
+
+	## External file name or extension ID (see NOTE.4)
+	var filename: String = ""
+
 ## 0x2018
 class Tags extends Chunk:
 	var tags_count: int = 0
@@ -1570,96 +1614,3 @@ class AsepriteFileReader extends RefCounted:
 			hex += "%02x" % buf[i]
 
 		return hex
-
-	func read_header():
-		## Header
-		# A 128-byte header (same as FLC/FLI header, but with other magic number):
-		#     DWORD       File size
-		#     WORD        Magic number (0xA5E0)
-		#     WORD        Frames
-		#     WORD        Width in pixels
-		#     WORD        Height in pixels
-		#     WORD        Color depth (bits per pixel)
-		#                   32 bpp = RGBA
-		#                   16 bpp = Grayscale
-		#                   8 bpp = Indexed
-		#     DWORD       Flags (see NOTE.6):
-		#                   1 = Layer opacity has valid value
-		#                   2 = Layer blend mode/opacity is valid for groups
-		#                       (composite groups separately first when rendering)
-		#                   4 = Layers have an UUID
-		#     WORD        Speed (milliseconds between frame, like in FLC files)
-		#                 DEPRECATED: You should use the frame duration field
-		#                 from each frame header
-		#     DWORD       Set be 0
-		#     DWORD       Set be 0
-		#     BYTE        Palette entry (index) which represent transparent color
-		#                 in all non-background layers (only for Indexed sprites).
-		#     BYTE[3]     Ignore these bytes
-		#     WORD        Number of colors (0 means 256 for old sprites)
-		#     BYTE        Pixel width (pixel ratio is "pixel width/pixel height").
-		#                 If this or pixel height field is zero, pixel ratio is 1:1
-		#     BYTE        Pixel height
-		#     SHORT       X position of the grid
-		#     SHORT       Y position of the grid
-		#     WORD        Grid width (zero if there is no grid, grid size
-		#                 is 16x16 on Aseprite by default)
-		#     WORD        Grid height (zero if there is no grid)
-		#     BYTE[84]    For future (set to zero)
-		var file_size := self.get_dword()
-
-		# Invalid magic number
-		if self.get_word() != 0xA5E0: return ERR_FILE_CORRUPT
-
-		var num_frames := self.get_word()
-		var width := self.get_word()
-		var height := self.get_word()
-		var color_depth := self.get_word()
-		var flags := self.get_dword()
-		var speed := self.get_word()
-
-		# Two consecutive DWORDs must be zero
-		if self.get_dword() != 0: return ERR_FILE_CORRUPT
-		if self.get_dword() != 0: return ERR_FILE_CORRUPT
-
-		var palette_transparent_index := self.get_byte()
-		self.skip(3)
-		var num_colors := self.get_word()
-		var pixel_width := self.get_byte()
-		var pixel_height := self.get_byte()
-		var grid_x := self.get_short()
-		var grid_y := self.get_short()
-		var grid_width := self.get_word()
-		var grid_height := self.get_word()
-		self.skip(84)
-
-	func read_frame():
-		# After the header come the "frames" data. Each frame has this little
-		# header of 16 bytes:
-		#     DWORD       Bytes in this frame
-		#     WORD        Magic number (always 0xF1FA)
-		#     WORD        Old field which specifies the number of "chunks"
-		#                 in this frame. If this value is 0xFFFF, we might
-		#                 have more chunks to read in this frame
-		#                 (so we have to use the new field)
-		#     WORD        Frame duration (in milliseconds)
-		#     BYTE[2]     For future (set to zero)
-		#     DWORD       New field which specifies the number of "chunks"
-		#                 in this frame (if this is 0, use the old field)
-		# Then each chunk format is:
-		#     DWORD       Chunk size
-		#     WORD        Chunk type
-		#     BYTE[]      Chunk data
-		# The chunk size includes the DWORD of the size itself, and the WORD of
-		# the chunk type, so a chunk size must be equal or greater than 6 bytes
-		# at least.
-		var frame := Frame.new()
-
-		frame.frame_size = self.get_dword()
-		if self.get_word() != 0xF1FA: return null
-		frame.chunks_num_old = self.get_word()
-		frame.duration = self.get_word()
-		self.skip(2) # For future (set to zero)
-		frame.chunks_num_new = self.get_dword()
-
-		return frame
