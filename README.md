@@ -12,13 +12,15 @@ Aseprite file parser for Godot Engine.
 - [x] Cel Extra Chunk (0x2006)
 - [x] Color Profile Chunk (0x2007)
 - [ ] External Files Chunk (0x2008)
-- [ ] Mask Chunk (0x2016) DEPRECATED
-- [ ] Path Chunk (0x2017) Never used
 - [x] Tags Chunk (0x2018)
 - [x] Palette Chunk (0x2019)
 - [ ] User Data Chunk (0x2020)
 - [x] Slice Chunk (0x2022)
 - [x] Tileset Chunk (0x2023)
+
+### Deprecated chunks
+- [ ] Mask Chunk (0x2016) DEPRECATED
+- [ ] Path Chunk (0x2017) Never used
 
 ## Script
 
