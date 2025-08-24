@@ -1,44 +1,67 @@
 ## This class is used to read Aseprite files and extract metadata such as frames and layers.
 class_name AsepriteFile extends RefCounted
 
-const PALETTE_COLOR_FLAG_HAS_NAME: int = 1
+const CHUNK_OLD_PALETTE_1 := Chunk.ChunkType.OLD_PALETTE_1
+const CHUNK_OLD_PALETTE_2 := Chunk.ChunkType.OLD_PALETTE_2
+const CHUNK_LAYER := Chunk.ChunkType.LAYER
+const CHUNK_CEL := Chunk.ChunkType.CEL
+const CHUNK_CEL_EXTRA := Chunk.ChunkType.CEL_EXTRA
+const CHUNK_COLOR_PROFILE := Chunk.ChunkType.COLOR_PROFILE
+const CHUNK_EXTERNAL_FILES := Chunk.ChunkType.EXTERNAL_FILES
+const CHUNK_MASK := Chunk.ChunkType.MASK
+const CHUNK_PATH := Chunk.ChunkType.PATH
+const CHUNK_TAGS := Chunk.ChunkType.TAGS
+const CHUNK_PALETTE := Chunk.ChunkType.PALETTE
+const CHUNK_USER_DATA := Chunk.ChunkType.USER_DATA
+const CHUNK_SLICE := Chunk.ChunkType.SLICE
+const CHUNK_TILESET := Chunk.ChunkType.TILESET
 
-const LAYER_FLAG_VISIBLE: int = 1
-const LAYER_FLAG_EDITABLE: int = 2
-const LAYER_FLAG_LOCK_MOVEMENT: int = 4
-const LAYER_FLAG_BACKGROUND: int = 8
-const LAYER_FLAG_PREFER_LINKED_CEL: int = 16
-const LAYER_FLAG_GROUP_COLLAPSED: int = 32
-const LAYER_FLAG_REFERENCE_LAYER: int = 64
+const PALETTE_COLOR_FLAG_HAS_NAME := PaletteColor.Flags.HAS_NAME
 
-const LAYER_TYPE_NORMAL: int = 0
-const LAYER_TYPE_GROUP: int = 1
-const LAYER_TYPE_TILEMAP: int = 2
+const LAYER_TYPE_NORMAL := Layer.Type.NORMAL
+const LAYER_TYPE_GROUP := Layer.Type.GROUP
+const LAYER_TYPE_TILEMAP := Layer.Type.TILEMAP
 
-const LAYER_BLEND_NORMAL: int = 0
-const LAYER_BLEND_MULTIPLY: int = 1
-const LAYER_BLEND_SCREEN: int = 2
-const LAYER_BLEND_OVERLAY: int = 3
-const LAYER_BLEND_DARKEN: int = 4
-const LAYER_BLEND_LIGHTEN: int = 5
-const LAYER_BLEND_COLOR_DODGE: int = 6
-const LAYER_BLEND_COLOR_BURN: int = 7
-const LAYER_BLEND_HARD_LIGHT: int = 8
-const LAYER_BLEND_SOFT_LIGHT: int = 9
-const LAYER_BLEND_DIFFERENCE: int = 10
-const LAYER_BLEND_EXCLUSION: int = 11
-const LAYER_BLEND_HUE: int = 12
-const LAYER_BLEND_SATURATION: int = 13
-const LAYER_BLEND_COLOR: int = 14
-const LAYER_BLEND_LUMINOSITY: int = 15
-const LAYER_BLEND_ADDITION: int = 16
-const LAYER_BLEND_SUBTRACT: int = 17
-const LAYER_BLEND_DIVIDE: int = 18
+const LAYER_FLAG_VISIBLE := Layer.Flags.VISIBLE
+const LAYER_FLAG_EDITABLE := Layer.Flags.EDITABLE
+const LAYER_FLAG_LOCK_MOVEMENT := Layer.Flags.LOCK_MOVEMENT
+const LAYER_FLAG_BACKGROUND := Layer.Flags.BACKGROUND
+const LAYER_FLAG_PREFER_LINKED_CEL := Layer.Flags.PREFER_LINKED_CELS
+const LAYER_FLAG_GROUP_COLLAPSED := Layer.Flags.GROUP_COLLAPSED
+const LAYER_FLAG_REFERENCE_LAYER := Layer.Flags.REFERENCE_LAYER
 
-const CEL_TYPE_IMAGE: int = 0
-const CEL_TYPE_LINKED: int = 1
-const CEL_TYPE_COMPRESSED_CEL: int = 2
-const CEL_TYPE_COMPRESSED_TILEMAP: int = 3
+const LAYER_BLEND_NORMAL := Layer.BlendMode.NORMAL
+const LAYER_BLEND_MULTIPLY := Layer.BlendMode.MULTIPLY
+const LAYER_BLEND_SCREEN := Layer.BlendMode.SCREEN
+const LAYER_BLEND_OVERLAY := Layer.BlendMode.OVERLAY
+const LAYER_BLEND_DARKEN := Layer.BlendMode.DARKEN
+const LAYER_BLEND_LIGHTEN := Layer.BlendMode.LIGHTEN
+const LAYER_BLEND_COLOR_DODGE := Layer.BlendMode.COLOR_DODGE
+const LAYER_BLEND_COLOR_BURN := Layer.BlendMode.COLOR_BURN
+const LAYER_BLEND_HARD_LIGHT := Layer.BlendMode.HARD_LIGHT
+const LAYER_BLEND_SOFT_LIGHT := Layer.BlendMode.SOFT_LIGHT
+const LAYER_BLEND_DIFFERENCE := Layer.BlendMode.DIFFERENCE
+const LAYER_BLEND_EXCLUSION := Layer.BlendMode.EXCLUSION
+const LAYER_BLEND_HUE := Layer.BlendMode.HUE
+const LAYER_BLEND_SATURATION := Layer.BlendMode.SATURATION
+const LAYER_BLEND_COLOR := Layer.BlendMode.COLOR
+const LAYER_BLEND_LUMINOSITY := Layer.BlendMode.LUMINOSITY
+const LAYER_BLEND_ADDITION := Layer.BlendMode.ADDITION
+const LAYER_BLEND_SUBTRACT := Layer.BlendMode.SUBTRACT
+const LAYER_BLEND_DIVIDE := Layer.BlendMode.DIVIDE
+
+const CEL_TYPE_IMAGE := Cel.Type.IMAGE
+const CEL_TYPE_LINKED := Cel.Type.LINKED_CEL
+const CEL_TYPE_COMPRESSED_CEL := Cel.Type.COMPRESSED_CEL
+const CEL_TYPE_COMPRESSED_TILEMAP := Cel.Type.COMPRESSED_TILEMAP
+
+const CEL_EXTRA_FLAG_PRECISE_BOUNDS := CelExtra.Flags.PRECISE_BOUNDS
+
+const COLOR_PROFILE_TYPE_NONE := ColorProfile.Type.NO_PROFILE
+const COLOR_PROFILE_TYPE_SRGB := ColorProfile.Type.SRGB
+const COLOR_PROFILE_TYPE_ICC := ColorProfile.Type.EMBEDDED_ICC
+
+const COLOR_PROFILE_FLAG_FIXED_GAMMA := ColorProfile.Flags.USE_FIXED_GAMMA
 
 const OPEN_FLAG_SKIP_BUFFER: int = 1 << 0
 
@@ -250,11 +273,13 @@ func open(path: String, flags: int = 0) -> int:
 				# Layer Chunk
 				0x2004:
 					var layer := Layer.new()
+
 					frame.chunks.append(layer)
+					self.layers.append(layer)
+
 					layer.chunk_size = current_chunk_size
 					layer.chunk_type = current_chunk_type
 
-					self.layers.append(layer)
 
 					# Read the layer data
 
@@ -287,11 +312,12 @@ func open(path: String, flags: int = 0) -> int:
 				# Cel Chunk
 				0x2005:
 					var cel := Cel.new()
+
 					frame.chunks.append(cel)
+					frame.cels.append(cel)
+
 					cel.chunk_size = current_chunk_size
 					cel.chunk_type = current_chunk_type
-
-					frame.cels.append(cel)
 
 					# Read the cel data
 
@@ -393,7 +419,9 @@ func open(path: String, flags: int = 0) -> int:
 				# Cel Extra Chunk (0x2006)
 				0x2006:
 					var cel_extra := CelExtra.new()
+
 					frame.chunks.append(cel_extra)
+
 					cel_extra.chunk_size = current_chunk_size
 					cel_extra.chunk_type = current_chunk_type
 
@@ -419,7 +447,9 @@ func open(path: String, flags: int = 0) -> int:
 				# Color Profile Chunk
 				0x2007:
 					self.color_profile = ColorProfile.new()
+
 					frame.chunks.append(self.color_profile)
+
 					self.color_profile.chunk_size = current_chunk_size
 					self.color_profile.chunk_type = current_chunk_type
 
@@ -457,7 +487,9 @@ func open(path: String, flags: int = 0) -> int:
 				# Palette Chunk
 				0x2019:
 					self.palette = Palette.new()
+
 					frame.chunks.append(self.palette)
+
 					self.palette.chunk_size = current_chunk_size
 					self.palette.chunk_type = current_chunk_type
 
@@ -485,6 +517,7 @@ func open(path: String, flags: int = 0) -> int:
 
 					for _palette_index in range(self.palette.palette_size):
 						var palette_color := PaletteColor.new()
+
 						self.palette.colors.append(palette_color)
 
 						palette_color.flags = _reader.get_word()
@@ -501,11 +534,12 @@ func open(path: String, flags: int = 0) -> int:
 				# Tileset Chunk
 				0x2023:
 					var tileset := Tileset.new()
+
 					frame.chunks.append(tileset)
+					self.tilesets.append(tileset)
+
 					tileset.chunk_size = current_chunk_size
 					tileset.chunk_type = current_chunk_type
-
-					self.tilesets.append(tileset)
 
 					tileset.id = _reader.get_dword()
 					tileset.flags = _reader.get_dword()
@@ -540,7 +574,9 @@ func open(path: String, flags: int = 0) -> int:
 					_reader.skip(current_chunk_size - 6)
 
 					var unknown_chunk := UnknownChunk.new()
+
 					frame.chunks.append(unknown_chunk)
+
 					unknown_chunk.chunk_size = current_chunk_size
 					unknown_chunk.chunk_type = current_chunk_type
 
@@ -889,33 +925,32 @@ class Frame extends RefCounted:
 		# Per spec, use old chunks count if new chunks count is zero
 		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
 
+	# func get_cels() -> Array[Cel]:
+	# 	return chunks.filter(func(c: Chunk): c is Cel)
+
 ## Base class for all chunks.
 class Chunk extends RefCounted:
-	const TYPE_LAYER_CHUNK: int = 0x2004
-	const TYPE_CEL_CHUNK: int = 0x2005
-	const TYPE_CEL_EXTRA_CHUNK: int = 0x2006
-	const TYPE_COLOR_PROFILE_CHUNK: int = 0x2007
-	const TYPE_PALETTE_CHUNK: int = 0x2019
-	const TYPE_TILESET_CHUNK: int = 0x2023
+	enum ChunkType {
+		OLD_PALETTE_1 = 0x0004, # DEPRECATED
+		OLD_PALETTE_2 = 0x0011, # DEPRECATED
+		LAYER = 0x2004,
+		CEL = 0x2005,
+		CEL_EXTRA = 0x2006,
+		COLOR_PROFILE = 0x2007,
+		EXTERNAL_FILES = 0x2008,
+		MASK = 0x2016, # DEPRECATED
+		PATH = 0x2017,
+		TAGS = 0x2018,
+		PALETTE = 0x2019,
+		USER_DATA = 0x2020,
+		SLICE = 0x2022,
+		TILESET = 0x2023,
+	}
 
 	var chunk_size: int = 0
 
 	## Chunk type
-	## Old palette chunk (0x0004)
-	## Old palette chunk (0x0011)
-	## Layer Chunk (0x2004)
-	## Cel Chunk (0x2005)
-	## Cel Extra Chunk (0x2006)
-	## Color Profile Chunk (0x2007)
-	## External Files Chunk (0x2008)
-	## Mask Chunk (0x2016) DEPRECATED
-	## Path Chunk (0x2017)
-	## Tags Chunk (0x2018)
-	## Palette Chunk (0x2019)
-	## User Data Chunk (0x2020)
-	## Slice Chunk (0x2022)
-	## Tileset Chunk (0x2023)
-	var chunk_type: int = 0
+	var chunk_type: ChunkType = 0
 
 ## 0x2019
 class Palette extends Chunk:
@@ -933,7 +968,10 @@ class Palette extends Chunk:
 		return self.colors[self.last_color] if self.colors.size() > self.last_color else null
 
 class PaletteColor extends RefCounted:
-	const FLAG_HAS_NAME: int = 1
+	enum Flags {
+		## 1 = Has Name
+		HAS_NAME = 1 << 0
+	}
 
 	## Color flags
 	## 1 = Has Name
@@ -955,7 +993,7 @@ class PaletteColor extends RefCounted:
 	var name: String = ""
 
 	func has_name() -> bool:
-		return (self.flags & FLAG_HAS_NAME) != 0
+		return (self.flags & Flags.HAS_NAME) != 0
 
 	## Convert to Godot Color
 	func to_color() -> Color:
@@ -968,21 +1006,52 @@ class PaletteColor extends RefCounted:
 
 ## 0x2004
 class Layer extends Chunk:
+	enum Type {
+		NORMAL = 0,
+		GROUP = 1,
+		TILEMAP = 2,
+	}
+
+	enum Flags {
+		VISIBLE = 1 << 0,
+		EDITABLE = 1 << 1,
+		LOCK_MOVEMENT = 1 << 2,
+		BACKGROUND = 1 << 3,
+		## The layer prefers linked cels over linked frames
+		PREFER_LINKED_CELS = 1 << 4,
+		## The layer group should be displayed collapsed
+		GROUP_COLLAPSED = 1 << 5,
+		## The layer is a reference layer
+		REFERENCE_LAYER = 1 << 6,
+	}
+
+	enum BlendMode {
+		NORMAL = 0,
+		MULTIPLY = 1,
+		SCREEN = 2,
+		OVERLAY = 3,
+		DARKEN = 4,
+		LIGHTEN = 5,
+		COLOR_DODGE = 6,
+		COLOR_BURN = 7,
+		HARD_LIGHT = 8,
+		SOFT_LIGHT = 9,
+		DIFFERENCE = 10,
+		EXCLUSION = 11,
+		HUE = 12,
+		SATURATION = 13,
+		COLOR = 14,
+		LUMINOSITY = 15,
+		ADDITION = 16,
+		SUBTRACT = 17,
+		DIVIDE = 18,
+	}
+
 	## Layer flags
-    ## 1 = Visible
-    ## 2 = Editable
-    ## 4 = Lock movement
-    ## 8 = Background
-    ## 16 = Prefer linked cels
-    ## 32 = The layer group should be displayed collapsed
-    ## 64 = The layer is a reference layer
-	var flags: int
+	var flags: Flags
 
 	## Layer type
-	## 0 = Normal (image) layer
-	## 1 = Group
-	## 2 = Tilemap
-	var type: int
+	var type: Type
 
 	## Layer child level
 	var child_level: int
@@ -994,26 +1063,7 @@ class Layer extends Chunk:
 	var default_height: int
 
 	## Blend mode
-    ## - Normal         = 0
-    ## - Multiply       = 1
-    ## - Screen         = 2
-    ## - Overlay        = 3
-    ## - Darken         = 4
-    ## - Lighten        = 5
-    ## - Color Dodge    = 6
-    ## - Color Burn     = 7
-    ## - Hard Light     = 8
-    ## - Soft Light     = 9
-    ## - Difference     = 10
-    ## - Exclusion      = 11
-    ## - Hue            = 12
-    ## - Saturation     = 13
-    ## - Color          = 14
-    ## - Luminosity     = 15
-    ## - Addition       = 16
-    ## - Subtract       = 17
-    ## - Divide         = 18
-	var blend_mode: int
+	var blend_mode: BlendMode
 
 	var opacity: int
 
@@ -1034,6 +1084,13 @@ class Layer extends Chunk:
 
 ## 0x2005
 class Cel extends Chunk:
+	enum Type {
+		IMAGE = 0,
+		LINKED_CEL = 1,
+		COMPRESSED_CEL = 2,
+		COMPRESSED_TILEMAP = 3,
+	}
+
 	## Layer index
 	var layer_index: int
 
@@ -1047,11 +1104,7 @@ class Cel extends Chunk:
 	var opacity: int
 
 	## Cell type
-	## 0 = Image
-	## 1 = Linked Cel
-	## 2 = Compressed Cel
-	## 3 = Compressed Tilemap
-	var type: int
+	var type: Cel.Type
 
 	## Z index of the cell
 	var z_index: int
@@ -1077,36 +1130,40 @@ class Cel extends Chunk:
 
 ## 0x2006
 class CelExtra extends Chunk:
-	const FLAG_PRECISE_BOUNDS: int = 1
+	enum Flags {
+		## Precise bounds are set
+		PRECISE_BOUNDS = 1 << 0
+	}
 
-	## 1 = Precise bounds are set
 	var flags: int = 0
-
 	var precise_x: float = 0.0
 	var precise_y: float = 0.0
-
 	var width: float = 0.0
 	var height: float = 0.0
 
 	func has_precise_bounds() -> bool:
-		return (self.flags & FLAG_PRECISE_BOUNDS) != 0
+		return (self.flags & Flags.PRECISE_BOUNDS) != 0
 
 ## 0x2007
 class ColorProfile extends Chunk:
-	const TYPE_NO_PROFILE: int = 0
-	const TYPE_SRGB: int = 1
-	const TYPE_EMBEDDED_ICC: int = 2
+	enum Type {
+		## no color profile (as in old .aseprite files)
+		NO_PROFILE = 0,
+		## use sRGB
+		SRGB = 1,
+		## use the embedded ICC profile
+		EMBEDDED_ICC = 2,
+	}
 
-	const FLAG_USE_FIXED_GAMMA: int = 1
+	enum Flags {
+		## use special fixed gamma
+		USE_FIXED_GAMMA = 1
+	}
 
 	## Color profile type
-	## 0 - no color profile (as in old .aseprite files)
-	## 1 - use sRGB
-	## 2 - use the embedded ICC profile
 	var type: int = 0
 
 	## Flags
-	## 1 - use special fixed gamma
 	var flags: int = 0
 
 	## Fixed gamma (1.0 = linear)
@@ -1116,29 +1173,41 @@ class ColorProfile extends Chunk:
 	## gamma = 1.0, it means that this is Linear sRGB.
 	var fixed_gamma: float = 0.0
 
-	## ICC Color profile data
+	## ICC Color profile data, only if type == EMBEDDED_ICC
 	var icc_data: PackedByteArray = []
 
 	func has_fixed_gamma() -> bool:
-		return (self.flags & FLAG_USE_FIXED_GAMMA) != 0
+		return (self.flags & Flags.USE_FIXED_GAMMA) != 0
 
 ## 0x2023
 class Tileset extends Chunk:
+	enum Flags {
+		## Include link to external file
+		INCLUDE_LINK_TO_EXTERNAL_FILE = 1 << 0,
+
+		## Include tiles inside this file
+		INCLUDE_TILES_INSIDE_FILE = 1 << 1,
+
+		## Tilemaps using this tileset use tile ID=0 as empty tile
+		## (this is the new format). In rare cases this bit is off,
+		## and the empty tile will be equal to 0xffffffff (used in
+		## internal versions of Aseprite)
+		TILEMAPS_USE_ID0_AS_EMPTY_TILE = 1 << 2,
+
+		## Aseprite will try to match modified tiles with their X
+		## flipped version automatically in Auto mode when using
+		## this tileset.
+		AUTO_X_FLIP = 1 << 3,
+
+		## Same for Y flips
+		AUTO_Y_FLIP = 1 << 4,
+
+		## Same for D(iagonal) flips
+		AUTO_DIAGONAL_FLIP = 1 << 5,
+	}
+
 	var id: int = 0
-
-	#   1 - Include link to external file
-	#   2 - Include tiles inside this file
-	#   4 - Tilemaps using this tileset use tile ID=0 as empty tile
-	#       (this is the new format). In rare cases this bit is off,
-	#       and the empty tile will be equal to 0xffffffff (used in
-	#       internal versions of Aseprite)
-	#   8 - Aseprite will try to match modified tiles with their X
-	#       flipped version automatically in Auto mode when using
-	#       this tileset.
-	#   16 - Same for Y flips
-	#   32 - Same for D(iagonal) flips
-	var flags: int = 0
-
+	var flags: Flags = 0
 	var tiles_count: int = 0
 	var tile_width: int = 0
 	var tile_height: int = 0
