@@ -349,11 +349,11 @@ func open(path: String, flags: int = 0) -> int:
 					#             compressed with ZLIB method (see NOTE.3)
 
 					cel_chunk.layer_index = _reader.get_word()
-					cel_chunk.x = _reader.get_word()
-					cel_chunk.y = _reader.get_word()
+					cel_chunk.x = _reader.get_short()
+					cel_chunk.y = _reader.get_short()
 					cel_chunk.opacity = _reader.get_byte()
 					cel_chunk.type = _reader.get_word()
-					cel_chunk.z_index = _reader.get_word()
+					cel_chunk.z_index = _reader.get_short()
 					_reader.skip(5) # Skip 5 bytes for future use
 
 					if cel_chunk.type == 0:
@@ -753,9 +753,9 @@ func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
 		Image.FORMAT_RGBA8
 	)
 
-	for cel_index in range(cels.size()):
-		var cel := cels[cel_index]
-		var img := get_frame_cel_image(frame_index, cel_index)
+	for index in range(cels.size()):
+		var cel := cels[index]
+		var img := get_frame_cel_image(frame_index, self.frames[frame_index].cels.find(cels[index]))
 
 		canvas.blit_rect(
 			img,
