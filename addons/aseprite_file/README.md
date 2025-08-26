@@ -25,3 +25,15 @@ Print all layer names
 for layer in ase_file.layers:
     print(layer.name)
 ```
+
+## Supported Chunks
+- [x] Layer Chunk [0x2004](./aseprite_file.gd#L1688)
+- [x] Cel Chunk [0x2005](./aseprite_file.gd#L1740)
+- [x] Cel Extra Chunk [0x2006](./aseprite_file.gd#L1788)
+- [x] Color Profile Chunk [0x2007](./aseprite_file.gd#L1811)
+- [x] External Files Chunk [0x2008](./aseprite_file.gd#L1836)
+- [x] Tags Chunk [0x2018](./aseprite_file.gd#L1869)
+- [x] Palette Chunk [0x2019](./aseprite_file.gd#L1909)
+- [ ] User Data Chunk (0x2020)
+- [x] Slice Chunk [0x2022](./aseprite_file.gd#L1955)
+- [x] Tileset Chunk [0x2023](./aseprite_file.gd#L2004)

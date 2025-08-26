@@ -65,8 +65,12 @@ const COLOR_PROFILE_FLAG_FIXED_GAMMA := ColorProfile.Flags.USE_FIXED_GAMMA
 
 const OPEN_FLAG_SKIP_BUFFER: int = 1 << 0
 
+const MAGIC_NUMBER: int = 0xA5E0
+
 ## Size of the file in bytes
 var file_size: int = -1
+
+var magic_number: int = 0
 
 ## Number of frames in the sprite
 var num_frames: int = 0
@@ -120,6 +124,8 @@ var grid_width: int = 0
 
 ## Grid height (zero if there is no grid)
 var grid_height: int = 0
+
+# -- END OF HEADER --
 
 ## Frames in the sprite.
 var frames: Array[Frame] = []
@@ -185,7 +191,7 @@ var tags: Array[Tag] = []
 
 # 	return ColorProfile.new()
 
-var _reader: AsepriteFileReader = null
+var _reader: AseReader = null
 
 ## Opens the Aseprite file for reading.
 ## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
@@ -205,7 +211,7 @@ func open(path: String, flags: int = 0) -> int:
 	# The file is too short to be a valid Aseprite file
 	if fs.get_length() < 128: return ERR_FILE_EOF
 
-	self._reader = AsepriteFileReader.new()
+	self._reader = AseReader.new()
 	self._reader.open(fs)
 
 	# region Read the header
@@ -945,8 +951,12 @@ static func create_raw_image_from_data(width: int, height: int, color_depth: int
 
 ## Represent a single frame.
 class Frame extends RefCounted:
+	const MAGIC_NUMBER := 0xF1FA
+
 	## Bytes in this frame
 	var frame_size: int = 0
+
+	var magic_number: int = 0
 
 	## Old field which specifies the number of "chunks"
 	## in this frame. If this value is 0xFFFF, we might
@@ -1347,27 +1357,49 @@ class UnsupportedChunk extends Chunk:
 # Additionally, get_xxx() do not return an error if the stream is empty
 # we are supposed to check get_available_bytes() first
 # however i am unusre if get_available_bytes() == 0 means we cant read no more
-class AsepriteFileReader extends RefCounted:
+class AseReader extends RefCounted:
+	enum ReadFlags {
+		SKIP_BUFFER = 1 << 0,
+		DECOMPRESS = 1 << 1,
+	}
+
+
 	var _stream: Variant = null
 
-	func open(data: Variant):
+	func open(data: Variant) -> Error:
 		if data is FileAccess:
 			data.big_endian = false
 			_stream = data
+			return OK
 
 		elif data is PackedByteArray:
 			var buffer := StreamPeerBuffer.new()
 			buffer.data_array = data
 			buffer.big_endian = false
 			_stream = buffer
+			return OK
 
 		elif data is StreamPeer:
 			data.big_endian = false
 			_stream = data
+			return OK
 
-	func close() -> void:
+		elif data is String:
+			var file := FileAccess.open(data, FileAccess.READ)
+			if file == null:
+				return FileAccess.get_open_error()
+			else:
+				file.big_endian = false
+				_stream = file
+				return OK
+
+		else:
+			return ERR_INVALID_PARAMETER
+
+	func close() -> Error:
 		if _stream is FileAccess: _stream.close()
 		_stream = null
+		return OK
 
 	func get_available_bytes() -> int:
 		if _stream is FileAccess: return _stream.get_length() - _stream.get_position()
@@ -1535,6 +1567,7 @@ class AsepriteFileReader extends RefCounted:
 
 		return hex
 
+	## Read a buffer, optionally decompressing it.
 	func read_buffer(length: int, flags: ReadFlags = 0, decompress_size: int = 0) -> PackedByteArray:
 		if flags & ReadFlags.SKIP_BUFFER != 0:
 			skip(length)
@@ -1547,6 +1580,63 @@ class AsepriteFileReader extends RefCounted:
 
 		return buf
 
+	# A 128-byte header (same as FLC/FLI header, but with other magic number):
+	# DWORD       File size
+	# WORD        Magic number (0xA5E0)
+	# WORD        Frames
+	# WORD        Width in pixels
+	# WORD        Height in pixels
+	# WORD        Color depth (bits per pixel)
+	# DWORD       Flags (see NOTE.6):
+	# WORD        Speed (milliseconds between frame, like in FLC files)
+	# DWORD       Set be 0
+	# DWORD       Set be 0
+	# BYTE        Palette entry (index) which represent transparent color in all non-background layers (only for Indexed sprites).
+	# BYTE[3]     Ignore these bytes
+	# WORD        Number of colors (0 means 256 for old sprites)
+	# BYTE        Pixel width (pixel ratio is "pixel width/pixel height"). If this or pixel height field is zero, pixel ratio is 1:1
+	# BYTE        Pixel height
+	# SHORT       X position of the grid
+	# SHORT       Y position of the grid
+	# WORD        Grid width (zero if there is no grid, grid size is 16x16 on Aseprite by default)
+	# WORD        Grid height (zero if there is no grid)
+	# BYTE[84]    For future (set to zero)
+	func read_header() -> AsepriteFile:
+		var ase := AsepriteFile.new()
+
+		ase.file_size = get_dword()
+		ase.magic_number = get_word()
+
+		# Do not read past the magic number if it's invalid
+		if ase.magic_number != AsepriteFile.MAGIC_NUMBER:
+			# push_warning("Aseprite - Invalid file magic number")
+			return ase
+
+		ase.num_frames = get_word()
+		ase.width = get_word()
+		ase.height = get_word()
+		ase.color_depth = get_word()
+		ase.flags = get_dword()
+		ase.speed = get_word()
+
+		# # Two consecutive DWORDs must be zero
+		# if get_dword() != 0: return ERR_FILE_CORRUPT
+		# if get_dword() != 0: return ERR_FILE_CORRUPT
+		skip(8)
+
+		ase.palette_entry = get_byte()
+		skip(3)
+		ase.num_colors = get_word()
+		ase.pixel_width = get_byte()
+		ase.pixel_height = get_byte()
+		ase.grid_x = get_word()
+		ase.grid_y = get_word()
+		ase.grid_width = get_word()
+		ase.grid_height = get_word()
+		skip(84)
+
+		return ase
+
 	# DWORD       Bytes in this frame
 	# WORD        Magic number (always 0xF1FA)
 	# WORD        Old field which specifies the number of "chunks" in this frame. If this value is 0xFFFF, we might have more chunks to read in this frame (so we have to use the new field)
@@ -1557,11 +1647,12 @@ class AsepriteFileReader extends RefCounted:
 		var frame := Frame.new()
 
 		frame.frame_size = get_dword()
+		frame.magic_number = get_word()
 
-		# Aseprite - Invalid frame magic number
-		if get_word() != 0xF1FA:
-			push_warning("Aseprite - Invalid frame magic number")
-			return null
+		# Do not read past the magic number if it's invalid
+		if frame.magic_number != Frame.MAGIC_NUMBER:
+			# push_warning("Aseprite - Invalid frame magic number")
+			return frame
 
 		frame.chunks_num_old = get_word()
 		frame.duration = get_word()
@@ -1935,11 +2026,75 @@ class AsepriteFileReader extends RefCounted:
 
 		return tileset
 
-	enum ReadFlags {
-		SKIP_BUFFER = 1 << 0,
-		DECOMPRESS = 1 << 1,
-	}
+	func read_empty_chunk(header: ChunkHeader) -> UnsupportedChunk:
+		var chunk := UnsupportedChunk.new()
 
+		chunk.chunk_size = header.size if header else 0
+		chunk.chunk_type = header.type if header else 0
+
+		skip(chunk.chunk_size - 6)
+
+		return chunk
+
+	func read_chunk(header: AsepriteFile, flags: ReadFlags = ReadFlags.DECOMPRESS) -> Chunk:
+		var chunk_header := read_chunk_header()
+		var color_depth := header.color_depth
+
+		match header.type:
+			AsepriteFile.Chunk.ChunkType.PALETTE: return read_palette_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.LAYER: return read_layer_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.CEL: return read_cel_chunk(chunk_header, color_depth, flags)
+			AsepriteFile.Chunk.ChunkType.CEL_EXTRA: return read_cel_extra_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.COLOR_PROFILE: return read_color_profile_chunk(chunk_header, flags)
+			AsepriteFile.Chunk.ChunkType.EXTERNAL_FILES: return read_external_files_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.TAGS: return read_tags_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.SLICE: return read_slice_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.TILESET: return read_tileset_chunk(chunk_header, color_depth, flags)
+			_: return read_empty_chunk(chunk_header)
+
+	func read_ase(flags: ReadFlags = 0) -> AsepriteFile:
+		var ase := read_header()
+
+		if ase.magic_number != AsepriteFile.MAGIC_NUMBER:
+			return ase
+
+		var frames: Array[Frame] = []
+		var layers: Array[Layer] = []
+		var tilesets: Array[Tileset] = []
+		var tags: Array[Tag] = []
+
+		for __ in range(ase.num_frames):
+			var frame := read_frame()
+
+			if frame.magic_number != Frame.MAGIC_NUMBER:
+				return ase
+
+			frames.append(frame)
+
+			for ___ in range(frame.get_chunks_count()):
+				frame.chunks.append(read_chunk(ase, flags))
+
+		frames.make_read_only()
+
+		for frame in frames:
+			for chunk in frame.chunks:
+				if chunk is AsepriteFile.Layer: layers.append(chunk)
+				elif chunk is AsepriteFile.Tileset: tilesets.append(chunk)
+				elif chunk is AsepriteFile.Tags: tags.append(chunk)
+				elif chunk is AsepriteFile.Cel: frame.cels.append(chunk)
+				elif chunk is AsepriteFile.Palette: ase.palette = chunk
+				elif chunk is AsepriteFile.ColorProfile: ase.color_profile = chunk
+
+		ase.frames = frames
+		ase.layers = layers
+		ase.tilesets = tilesets
+		ase.tags = tags
+
+		return ase
+
+	## Represent a chunk header
+	## DWORD       Chunk size
+	## WORD        Chunk type
 	class ChunkHeader extends RefCounted:
 		var size: int = 0
 		var type: int = 0
