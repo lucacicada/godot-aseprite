@@ -52,15 +52,13 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
 
-	var ase_file := AsepriteFile.new()
+	var ase := AsepriteFile.open(source_file)
 
-	err = ase_file.open(source_file)
-
-	if err != OK:
-		push_warning("Aseprite - Failed to open file: %s" % error_string(err))
+	if ase == null:
+		push_warning("Aseprite - Failed to open file: %s" % error_string(AsepriteFile.get_open_error()))
 		return err
 
-	var layer_index := ase_file.layers.find_custom(func(layer: AsepriteFile.Layer) -> bool:
+	var layer_index := ase.layers.find_custom(func(layer: AsepriteFile.Layer) -> bool:
 		if layer.is_hidden():
 			return false
 
@@ -77,11 +75,11 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		push_warning("Aseprite - No visible layers found in the file.")
 		return FAILED
 
-	if ase_file.is_layer_frame_empty(layer_index, 0):
+	if ase.is_layer_frame_empty(layer_index, 0):
 		push_warning("Aseprite - The first frame of the visible layer is empty.")
 		return FAILED
 
-	var layer_image := ase_file.get_layer_frame_image(layer_index, 0)
+	var layer_image := ase.get_layer_frame_image(layer_index, 0)
 
 	var option_export_path: String = options.get("external/path", "")
 

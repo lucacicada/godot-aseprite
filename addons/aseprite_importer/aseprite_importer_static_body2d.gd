@@ -74,18 +74,17 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
 
-	var ase_file := AsepriteFile.new()
+	var ase := AsepriteFile.open(source_file)
 
-	err = ase_file.open(source_file)
-	if err != OK:
-		push_warning("Aseprite - Failed to open file: %s" % error_string(err))
+	if ase == null:
+		push_warning("Aseprite - Failed to open file: %s" % error_string(AsepriteFile.get_open_error()))
 		return err
 
-	if ase_file.layers.size() == 0:
+	if ase.layers.size() == 0:
 		push_warning("Aseprite - No layers found in the file.")
 		return ERR_FILE_CANT_OPEN
 
-	if ase_file.frames.size() == 0:
+	if ase.frames.size() == 0:
 		push_warning("Aseprite - No frames found in the file.")
 		return ERR_FILE_CANT_OPEN
 
@@ -100,8 +99,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	# collision_shape.shape = RectangleShape2D.new()
 	# collision_shape.shape.size = Vector2()
 
-	for layer_index in range(ase_file.layers.size()):
-		var layer := ase_file.layers[layer_index]
+	for layer_index in range(ase.layers.size()):
+		var layer := ase.layers[layer_index]
 
 		# Skip fully transparent layers
 		if layer.opacity == 0:
@@ -112,11 +111,11 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			continue
 
 		if layer.name.containsn("collision") or layer.name.ends_with("-col"):
-			if ase_file.is_layer_frame_empty(layer_index, 0):
+			if ase.is_layer_frame_empty(layer_index, 0):
 				push_warning("Aseprite - Collision layer is empty: %s" % layer.name)
 				continue
 
-			var frame_img := ase_file.get_layer_frame_image(layer_index, 0)
+			var frame_img := ase.get_layer_frame_image(layer_index, 0)
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(frame_img)
 
@@ -126,7 +125,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			for points in polygons:
 				# Offset the points
 				for i in range(points.size()):
-					points[i] = Vector2(points[i].x, points[i].y - ase_file.height)
+					points[i] = Vector2(points[i].x, points[i].y - ase.height)
 
 				var collision_polygon := CollisionPolygon2D.new()
 				static_body.add_child(collision_polygon)
@@ -137,11 +136,11 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 		var frame_canvas: Array[Image] = []
 
-		for frame_index in range(ase_file.frames.size()):
-			var frame := ase_file.frames[frame_index]
+		for frame_index in range(ase.frames.size()):
+			var frame := ase.frames[frame_index]
 
-			if not ase_file.is_layer_frame_empty(layer_index, frame_index):
-				var frame_img := ase_file.get_layer_frame_image(layer_index, frame_index)
+			if not ase.is_layer_frame_empty(layer_index, frame_index):
+				var frame_img := ase.get_layer_frame_image(layer_index, frame_index)
 				frame_canvas.append(frame_img)
 
 		if frame_canvas.is_empty():
@@ -153,7 +152,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			sprite.owner = static_body
 			sprite.name = layer.name
 			sprite.centered = false
-			sprite.position.y = - ase_file.height
+			sprite.position.y = - ase.height
 
 			var layer_image := frame_canvas[0]
 
@@ -168,7 +167,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			anim_sprite.owner = static_body
 			anim_sprite.name = layer.name
 			anim_sprite.centered = false
-			anim_sprite.position.y = - ase_file.height
+			anim_sprite.position.y = - ase.height
 
 			var anim_sprite_frames := SpriteFrames.new()
 			anim_sprite.frames = anim_sprite_frames

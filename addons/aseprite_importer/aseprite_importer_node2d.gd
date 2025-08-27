@@ -27,7 +27,13 @@ func _configure_presets() -> void:
 	])
 
 func _configure_input_options(path: String, preset_index: int) -> void:
-	var layers := get_layers()
+	var ase := AsepriteFile.open(path, AsepriteFile.OPEN_FLAGS_SKIP_BUFFER)
+
+	if ase == null:
+		push_warning("Aseprite - Failed to inspect file: %s" % error_string(AsepriteFile.get_open_error()))
+		return
+
+	var layers: Array[AsepriteFile.Layer] = ase.layers.duplicate()
 	layers.reverse()
 
 	for layer in layers:
@@ -42,31 +48,31 @@ func _configure_input_options(path: String, preset_index: int) -> void:
 		elif layer.name.containsn("Area2D") or layer.name.containsn("LightOccluder2D") or layer.name.ends_with("-area"):
 			import_type = 2 # Area2D
 
-		add_import_option_layer(layer, {
+		add_import_option_layer(ase, layer, {
 			"name": "export",
 			"default_value": not is_noimport,
 		})
 
-		add_import_option_layer(layer, {
+		add_import_option_layer(ase, layer, {
 			"name": "export_path",
 			"default_value": "",
 			"property_hint": PROPERTY_HINT_SAVE_FILE,
 			"hint_string": "*.png",
 		})
 
-		add_import_option_layer(layer, {
+		add_import_option_layer(ase, layer, {
 			"name": "visible",
 			"default_value": layer.is_visible(),
 		})
 
-		add_import_option_layer(layer, {
+		add_import_option_layer(ase, layer, {
 			"name": "opacity",
 			"default_value": layer.opacity,
 			"property_hint": PROPERTY_HINT_RANGE,
 			"hint_string": "0,255,1",
 		})
 
-		add_import_option_layer(layer, {
+		add_import_option_layer(ase, layer, {
 			"name": "type",
 			"default_value": import_type,
 			"property_hint": PROPERTY_HINT_ENUM,
@@ -76,13 +82,11 @@ func _configure_input_options(path: String, preset_index: int) -> void:
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
 
-	var ase_file := AsepriteFile.new()
+	var ase := AsepriteFile.open(source_file)
 
-	err = ase_file.open(source_file)
-
-	if err != OK:
-		push_warning("Aseprite - Failed to open file: %s" % error_string(err))
-		return err
+	if ase == null:
+		push_warning("Aseprite - Failed to open file: %s" % error_string(AsepriteFile.get_open_error()))
+		return ERR_CANT_OPEN
 
 	var options_transform_anchor := options.get("sprite/offset", 0)
 
@@ -94,16 +98,16 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		push_warning("Aseprite - Failed to pack scene: %s" % error_string(err))
 		return err
 
-	for layer_index in range(ase_file.layers.size()):
-		var layer := ase_file.layers[layer_index]
+	for layer_index in range(ase.layers.size()):
+		var layer := ase.layers[layer_index]
 
-		if ase_file.is_layer_frame_empty(layer_index, 0):
+		if ase.is_layer_frame_empty(layer_index, 0):
 			continue
 
-		var option_export: bool = options.get("layers/%s_(#%s)/export" % [_normalize_layer_name(layer.name), layer_index], true)
-		var option_export_path: String = options.get("layers/%s_(#%s)/export_path" % [_normalize_layer_name(layer.name), layer_index], "")
-		var option_visible: bool = options.get("layers/%s_(#%s)/visible" % [_normalize_layer_name(layer.name), layer_index], true)
-		var option_type: int = options.get("layers/%s_(#%s)/type" % [_normalize_layer_name(layer.name), layer_index], 0)
+		var option_export: bool = get_import_option_layer(ase, layer, "export", options, true)
+		var option_export_path: String = get_import_option_layer(ase, layer, "export_path", options, "")
+		var option_visible: bool = get_import_option_layer(ase, layer, "visible", options, true)
+		var option_type: int = get_import_option_layer(ase, layer, "type", options, 0)
 
 		if not option_export:
 			continue
@@ -119,25 +123,25 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				0: # Bottom Left
 					sprite.centered = false
 					sprite.position.x = 0
-					sprite.position.y = - ase_file.height
+					sprite.position.y = - ase.height
 				1: # Bottom Right
 					sprite.centered = false
-					sprite.position.x = - ase_file.width
-					sprite.position.y = - ase_file.height
+					sprite.position.x = - ase.width
+					sprite.position.y = - ase.height
 				2: # Top Left
 					sprite.centered = false
 					sprite.position.x = 0
 					sprite.position.y = 0
 				3: # Top Right
 					sprite.centered = false
-					sprite.position.x = - ase_file.width
+					sprite.position.x = - ase.width
 					sprite.position.y = 0
 				4: # Center
 					sprite.centered = true
 					sprite.position.x = 0
 					sprite.position.y = 0
 
-			var layer_image := ase_file.get_layer_frame_image(layer_index, 0)
+			var layer_image := ase.get_layer_frame_image(layer_index, 0)
 
 			if option_export_path.is_empty():
 				var texture := PortableCompressedTexture2D.new()
@@ -163,7 +167,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				sprite.texture = ResourceLoader.load(option_export_path, "Texture2D", ResourceLoader.CACHE_MODE_REPLACE)
 
 		elif option_type == 2:
-			var frame_img := ase_file.get_layer_frame_image(layer_index, 0)
+			var frame_img := ase.get_layer_frame_image(layer_index, 0)
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(frame_img)
 
@@ -178,7 +182,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			for points in polygons:
 				# Offset the points
 				for i in range(points.size()):
-					points[i] = Vector2(points[i].x, points[i].y - ase_file.height)
+					points[i] = Vector2(points[i].x, points[i].y - ase.height)
 
 				var collision_polygon := CollisionPolygon2D.new()
 				area2d.add_child(collision_polygon)
@@ -188,7 +192,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			pass
 
 		else:
-			var frame_img := ase_file.get_layer_frame_image(layer_index, 0)
+			var frame_img := ase.get_layer_frame_image(layer_index, 0)
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(frame_img)
 
@@ -204,7 +208,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			for points in polygons:
 				# Offset the points
 				for i in range(points.size()):
-					points[i] = Vector2(points[i].x, points[i].y - ase_file.height)
+					points[i] = Vector2(points[i].x, points[i].y - ase.height)
 
 				var collision_polygon := CollisionPolygon2D.new()
 				static_body.add_child(collision_polygon)

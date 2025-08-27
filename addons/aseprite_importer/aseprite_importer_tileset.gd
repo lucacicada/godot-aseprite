@@ -46,36 +46,34 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
 
-	var ase_file := AsepriteFile.new()
-
-	err = ase_file.open(source_file)
-	if err != OK:
-		push_warning("Aseprite - Failed to open file: %s" % error_string(err))
+	var ase := AsepriteFile.open(source_file)
+	if ase == null:
+		push_warning("Aseprite - Failed to open file: %s" % error_string(AsepriteFile.get_open_error()))
 		return err
 
-	if ase_file.layers.size() == 0:
+	if ase.layers.size() == 0:
 		push_warning("Aseprite - No layers found in the file.")
 		return ERR_FILE_CANT_OPEN
 
-	if ase_file.frames.size() == 0:
+	if ase.frames.size() == 0:
 		push_warning("Aseprite - No frames found in the file.")
 		return ERR_FILE_CANT_OPEN
 
-	if ase_file.tilesets.size() == 0:
+	if ase.tilesets.size() == 0:
 		push_warning("Aseprite - No tilesets found in the file.")
 		return ERR_FILE_CANT_OPEN
 
 	var res := TileSet.new()
 
-	for layer_index in range(ase_file.layers.size()):
-		var layer := ase_file.layers[layer_index]
+	for layer_index in range(ase.layers.size()):
+		var layer := ase.layers[layer_index]
 
 		if layer.type != AsepriteFile.LAYER_TYPE_TILEMAP:
 			continue
 
-		var tileset := ase_file.tilesets[layer.tileset_index]
+		var tileset := ase.tilesets[layer.tileset_index]
 
-		var canvas := ase_file.get_layer_frame_image(layer_index, 0)
+		var canvas := ase.get_layer_frame_image(layer_index, 0)
 
 		var texture := PortableCompressedTexture2D.new()
 		texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
@@ -86,7 +84,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		tile_set_atlas_source.separation = Vector2i(0, 0)
 		tile_set_atlas_source.margins = Vector2i(0, 0)
 
-		for x in range(ase_file.width / tileset.tile_width):
+		for x in range(ase.width / tileset.tile_width):
 			for y in range(canvas.get_height() / tileset.tile_height):
 				tile_set_atlas_source.create_tile(Vector2i(x, y))
 

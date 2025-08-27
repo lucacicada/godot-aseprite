@@ -5,16 +5,16 @@
 Aseprite file parser for Godot Engine.
 
 ## Supported Chunks
-- [x] Layer Chunk (0x2004)
-- [x] Cel Chunk (0x2005)
-- [x] Cel Extra Chunk (0x2006)
-- [x] Color Profile Chunk (0x2007)
-- [x] External Files Chunk (0x2008)
-- [x] Tags Chunk (0x2018)
-- [x] Palette Chunk (0x2019)
-- [ ] User Data Chunk (0x2020)
-- [x] Slice Chunk (0x2022)
-- [x] Tileset Chunk (0x2023)
+- [x] Layer Chunk [0x2004]
+- [x] Cel Chunk [0x2005]
+- [x] Cel Extra Chunk [0x2006]
+- [x] Color Profile Chunk [0x2007]
+- [x] External Files Chunk [0x2008]
+- [x] Tags Chunk [0x2018]
+- [x] Palette Chunk [0x2019]
+- [ ] User Data Chunk [0x2020]
+- [x] Slice Chunk [0x2022]
+- [x] Tileset Chunk [0x2023]
 
 ### Legacy chunks
 

@@ -1,3 +1,4 @@
+@tool
 extends EditorImportPlugin
 
 var _configuring_presets := false
@@ -31,21 +32,13 @@ func _get_preset_name(preset_index: int) -> String: return _get_presets()[preset
 
 var _configuring_options := false
 var _options: Array = []
-var _options_path: String = ""
-var _options_ase: AsepriteFile = null
 
 func _get_import_options(path: String, preset_index: int) -> Array:
 	_options = _get_presets()[preset_index]["options"].duplicate(true)
 
-	_options_ase = null
-	_options_path = path
-
 	_configuring_options = true
 	_configure_input_options(path, preset_index)
 	_configuring_options = false
-
-	_options_ase = null
-	_options_path = ""
 
 	var options = _options.duplicate()
 	_options = []
@@ -68,44 +61,29 @@ func add_import_option(value: Dictionary) -> void:
 	assert(_configuring_options, "add_import_option can only be called from _configure_input_options")
 	_options.append(value)
 
-func add_import_option_layer(layer: AsepriteFile.Layer, value: Dictionary) -> void:
+func add_import_option_layer(ase: AsepriteFile, layer: AsepriteFile.Layer, value: Dictionary) -> void:
 	assert(_configuring_options, "add_import_option_layer can only be called from _configure_input_options")
-	assert(_options_ase, "add_import_option_layer can only be called after get_layers")
 
-	value.set("name", _get_layer_option_name(_options_ase, layer, value.get("name", "")))
+	value.set("name", _get_layer_option_name(ase, layer, value.get("name", "")))
 
 	add_import_option(value)
 
-func get_layers() -> Array[AsepriteFile.Layer]:
-	assert(_configuring_options, "get_layers can only be called from _configure_input_options")
-	return _get_ase().layers.duplicate()
+func get_import_option_layer(ase: AsepriteFile, layer: AsepriteFile.Layer, option: String, options: Dictionary, default: Variant = null) -> Variant:
+	var name := _get_layer_option_name(ase, layer, option)
+	return options.get(name, default)
 
-func _get_ase() -> AsepriteFile:
-	assert(_configuring_options, "_get_ase can only be called from _configure_input_options")
-
-	if _options_ase:
-		return _options_ase
-
-	_options_ase = AsepriteFile.new()
-	var err := _options_ase.open(_options_path, AsepriteFile.OPEN_FLAG_SKIP_BUFFER)
-	if err != OK:
-		_options_ase.close()
-		push_warning("Aseprite - Failed to inspect file: %s" % error_string(err))
-
-	return _options_ase
-
-static func _normalize_layer_name(name: String) -> String:
-	return name.validate_node_name().replace(" ", "_").replace("/", "_").replace("\\", "_").to_lower()
-
-static func _get_layer_option_name(ase_file: AsepriteFile, layer: AsepriteFile.Layer, option: String) -> String:
+static func _get_layer_option_name(ase: AsepriteFile, layer: AsepriteFile.Layer, option: String) -> String:
 	var stack: Array[String] = []
-	for layer_index in range(ase_file.layers.size()):
-		var current_layer := ase_file.layers[layer_index]
+	for layer_index in range(ase.layers.size()):
+		var current_layer := ase.layers[layer_index]
 
 		while stack.size() > current_layer.child_level:
 			stack.pop_back()
 
-		var seg := "%s_(#%s)" % [_normalize_layer_name(layer.name), layer_index]
+		# Normalize the layer name to avoid issues with special characters
+		var layer_name := current_layer.name.validate_node_name().replace(" ", "_").replace("/", "_").replace("\\", "_").to_lower()
+
+		var seg := "%s_(#%s)" % [layer_name, layer_index]
 		var base_name := "/".join(["layers"] + stack + [seg])
 		stack.append(seg)
 

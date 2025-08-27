@@ -63,7 +63,7 @@ const COLOR_PROFILE_TYPE_ICC := ColorProfile.Type.EMBEDDED_ICC
 
 const COLOR_PROFILE_FLAG_FIXED_GAMMA := ColorProfile.Flags.USE_FIXED_GAMMA
 
-const OPEN_FLAG_SKIP_BUFFER: int = 1 << 0
+const OPEN_FLAGS_SKIP_BUFFER := AsepriteReader.ReadFlags.SKIP_BUFFER
 
 const MAGIC_NUMBER: int = 0xA5E0
 
@@ -130,19 +130,22 @@ var grid_height: int = 0
 ## Frames in the sprite.
 var frames: Array[Frame] = []
 
+var external_files: Array[ExternalFile] = []
+
 ## Layers in the sprite.
 var layers: Array[Layer] = []
 
 ## A tileset is a collection of individual tiles, arranged in a grid.
 var tilesets: Array[Tileset] = []
 
+## Tag list
+var tags: Array[Tag] = []
+
 ## The palette used in the sprite.
 var palette: Palette = Palette.new()
 
 ## The color profile used in the sprite.
 var color_profile: ColorProfile = ColorProfile.new()
-
-var tags: Array[Tag] = []
 
 # func get_frames() -> Array[Frame]:
 # 	return self.frames.duplicate()
@@ -190,542 +193,6 @@ var tags: Array[Tag] = []
 # 				return chunk
 
 # 	return ColorProfile.new()
-
-var _reader: AseReader = null
-
-## Opens the Aseprite file for reading.
-## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
-func open(path: String, flags: int = 0) -> int:
-	# Do not allow to re-open the file
-	if _reader: return ERR_ALREADY_IN_USE
-
-	# Reset the state, in the future maybe we can reuse this instance
-	self.file_size = -1
-	self.palette = Palette.new()
-	self.frames = []
-	self.layers = []
-
-	var fs := FileAccess.open(path, FileAccess.READ)
-	if not fs: return FileAccess.get_open_error()
-
-	# The file is too short to be a valid Aseprite file
-	if fs.get_length() < 128: return ERR_FILE_EOF
-
-	self._reader = AseReader.new()
-	self._reader.open(fs)
-
-	# region Read the header
-
-	self.file_size = _reader.get_dword()
-
-	# Check the magic number
-	if _reader.get_word() != 0xA5E0: return ERR_FILE_CORRUPT
-
-	self.num_frames = _reader.get_word()
-	self.width = _reader.get_word()
-	self.height = _reader.get_word()
-	self.color_depth = _reader.get_word()
-	self.flags = _reader.get_dword()
-	self.speed = _reader.get_word()
-
-	# # Two consecutive DWORDs must be zero
-	# if _reader.get_dword() != 0: return ERR_FILE_CORRUPT
-	# if _reader.get_dword() != 0: return ERR_FILE_CORRUPT
-	_reader.skip(8) # Skip 2*4 bytes
-
-	self.palette_entry = _reader.get_byte()
-	_reader.skip(3) # Skip 3 bytes
-	self.num_colors = _reader.get_word()
-	self.pixel_width = _reader.get_byte()
-	self.pixel_height = _reader.get_byte()
-	self.grid_x = _reader.get_word()
-	self.grid_y = _reader.get_word()
-	self.grid_width = _reader.get_word()
-	self.grid_height = _reader.get_word()
-	_reader.skip(84)
-
-	# endregion
-
-	# Sanity check for header size
-	if fs.get_position() != 128: return ERR_FILE_EOF
-
-	var frames: Array[Frame] = []
-
-	# Read the frames
-	for _frame_index in range(self.num_frames):
-		var frame := Frame.new()
-		frames.append(frame)
-
-		frame.frame_size = _reader.get_dword()
-
-		# Aseprite - Invalid frame magic number
-		if _reader.get_word() != 0xF1FA: return ERR_FILE_CORRUPT
-
-		frame.chunks_num_old = _reader.get_word()
-		frame.duration = _reader.get_word()
-		_reader.skip(2) # For future (set to zero)
-		frame.chunks_num_new = _reader.get_dword()
-
-		# Per spec, use old chunks count if new chunks count is zero
-		var chunks_num := frame.chunks_num_old if frame.chunks_num_new == 0 else frame.chunks_num_new
-
-		# Read each chunk in the frame
-		for chunk_index in range(chunks_num):
-			# Read the chunk header
-			var current_chunk_size := _reader.get_dword()
-			var current_chunk_type := _reader.get_word()
-
-			match current_chunk_type:
-				# Layer Chunk
-				0x2004:
-					var layer_chunk := Layer.new()
-
-					frame.chunks.append(layer_chunk)
-
-					layer_chunk.chunk_size = current_chunk_size
-					layer_chunk.chunk_type = current_chunk_type
-
-					# WORD        Flags
-					# WORD        Layer type
-					# WORD        Layer child level (see NOTE.1)
-					# WORD        Default layer width in pixels (ignored)
-					# WORD        Default layer height in pixels (ignored)
-					# WORD        Blend mode (see NOTE.6)
-					# BYTE        Opacity (see NOTE.6)
-					# BYTE[3]     For future (set to zero)
-					# STRING      Layer name
-					# + If layer type = 2
-					#   DWORD     Tileset index
-					# + If file header flags have bit 4:
-					#   UUID      Layer's universally unique identifier
-
-					layer_chunk.flags = _reader.get_word()
-					layer_chunk.type = _reader.get_word()
-					layer_chunk.child_level = _reader.get_word()
-					layer_chunk.default_width = _reader.get_word()
-					layer_chunk.default_height = _reader.get_word()
-					layer_chunk.blend_mode = _reader.get_word()
-					layer_chunk.opacity = _reader.get_byte()
-					_reader.skip(3) # Skip 3 bytes for future use
-					layer_chunk.name = _reader.get_string()
-					if layer_chunk.type == 2: layer_chunk.tileset_index = _reader.get_dword()
-					if layer_chunk.flags & 4: layer_chunk.uuid = _reader.get_uuid()
-
-				# Cel Chunk
-				0x2005:
-					var cel_chunk := Cel.new()
-
-					frame.chunks.append(cel_chunk)
-					frame.cels.append(cel_chunk)
-
-					cel_chunk.chunk_size = current_chunk_size
-					cel_chunk.chunk_type = current_chunk_type
-
-					# WORD        Layer index (see NOTE.2)
-					# SHORT       X position
-					# SHORT       Y position
-					# BYTE        Opacity level
-					# WORD        Cel Type
-					# SHORT       Z-Index (see NOTE.5)
-					# BYTE[5]     For future (set to zero)
-					# + For cel type = 0 (Raw Image Data)
-					#   WORD      Width in pixels
-					#   WORD      Height in pixels
-					#   PIXEL[]   Raw pixel data: row by row from top to bottom,
-					#             for each scanline read pixels from left to right.
-					# + For cel type = 1 (Linked Cel)
-					#   WORD      Frame position to link with
-					# + For cel type = 2 (Compressed Image)
-					#   WORD      Width in pixels
-					#   WORD      Height in pixels
-					#   PIXEL[]   "Raw Cel" data compressed with ZLIB method (see NOTE.3)
-					# + For cel type = 3 (Compressed Tilemap)
-					#   WORD      Width in number of tiles
-					#   WORD      Height in number of tiles
-					#   WORD      Bits per tile (at the moment it's always 32-bit per tile)
-					#   DWORD     Bitmask for tile ID (e.g. 0x1fffffff for 32-bit tiles)
-					#   DWORD     Bitmask for X flip
-					#   DWORD     Bitmask for Y flip
-					#   DWORD     Bitmask for diagonal flip (swap X/Y axis)
-					#   BYTE[10]  Reserved
-					#   TILE[]    Row by row, from top to bottom tile by tile
-					#             compressed with ZLIB method (see NOTE.3)
-
-					cel_chunk.layer_index = _reader.get_word()
-					cel_chunk.x = _reader.get_short()
-					cel_chunk.y = _reader.get_short()
-					cel_chunk.opacity = _reader.get_byte()
-					cel_chunk.type = _reader.get_word()
-					cel_chunk.z_index = _reader.get_short()
-					_reader.skip(5) # Skip 5 bytes for future use
-
-					if cel_chunk.type == 0:
-						cel_chunk.w = _reader.get_word()
-						cel_chunk.h = _reader.get_word()
-
-						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							# 26 is the number of bytes in the header we have just read
-							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 26)
-
-							# Aseprite - Cel buffer size mismatch
-							if cel_chunk.buffer.size() != cel_chunk.w * cel_chunk.h * (self.color_depth / 8):
-								return ERR_FILE_CORRUPT
-						else:
-							_reader.skip(current_chunk_size - 26)
-
-					elif cel_chunk.type == 1:
-						cel_chunk.link = _reader.get_word()
-
-					elif cel_chunk.type == 2:
-						cel_chunk.w = _reader.get_word()
-						cel_chunk.h = _reader.get_word()
-
-						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							# 26 is the number of bytes in the header we have just read
-							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 26)
-
-							# ZLIB compressed buffer
-							cel_chunk.buffer = cel_chunk.buffer.decompress(cel_chunk.w * cel_chunk.h * (self.color_depth / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						else:
-							_reader.skip(current_chunk_size - 26)
-
-					elif cel_chunk.type == 3:
-						cel_chunk.w = _reader.get_word()
-						cel_chunk.h = _reader.get_word()
-						cel_chunk.bits_per_tile = _reader.get_word()
-						cel_chunk.bitmask_for_tile_id = _reader.get_dword()
-						cel_chunk.bitmask_for_x_flip = _reader.get_dword()
-						cel_chunk.bitmask_for_y_flip = _reader.get_dword()
-						cel_chunk.bitmask_for_90cw_rotation = _reader.get_dword()
-						_reader.skip(10) # Skip 10 bytes for reserved
-
-						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							# 54 is the number of bytes in the header we have just read
-							cel_chunk.buffer = _reader.get_buffer(current_chunk_size - 54)
-
-							# ZLIB compressed buffer
-							cel_chunk.buffer = cel_chunk.buffer.decompress(cel_chunk.w * cel_chunk.h * (cel_chunk.bits_per_tile / 8), FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						else:
-							_reader.skip(current_chunk_size - 54)
-
-				# Cel Extra Chunk (0x2006)
-				0x2006:
-					var cel_extra_chunk := CelExtra.new()
-
-					frame.chunks.append(cel_extra_chunk)
-
-					cel_extra_chunk.chunk_size = current_chunk_size
-					cel_extra_chunk.chunk_type = current_chunk_type
-
-					# Adds extra information to the latest read cel.
-
-					#     DWORD       Flags (set to zero)
-					#                   1 = Precise bounds are set
-					#     FIXED       Precise X position
-					#     FIXED       Precise Y position
-					#     FIXED       Width of the cel in the sprite (scaled in real-time)
-					#     FIXED       Height of the cel in the sprite
-					#     BYTE[16]    For future use (set to zero)
-
-					cel_extra_chunk.flags = _reader.get_word()
-					cel_extra_chunk.precise_x = _reader.get_fixed()
-					cel_extra_chunk.precise_y = _reader.get_fixed()
-					cel_extra_chunk.width = _reader.get_fixed()
-					cel_extra_chunk.height = _reader.get_fixed()
-					_reader.skip(16) # Skip 16 bytes for future use
-
-					frame.cels[frame.cels.size() - 1].extra = cel_extra_chunk
-
-				# Color Profile Chunk
-				0x2007:
-					var color_profile_chunk := ColorProfile.new()
-
-					self.color_profile = color_profile_chunk
-					frame.chunks.append(color_profile_chunk)
-
-					color_profile_chunk.chunk_size = current_chunk_size
-					color_profile_chunk.chunk_type = current_chunk_type
-
-					# WORD        Type
-					#               0 - no color profile (as in old .aseprite files)
-					#               1 - use sRGB
-					#               2 - use the embedded ICC profile
-					# WORD        Flags
-					#               1 - use special fixed gamma
-					# FIXED       Fixed gamma (1.0 = linear)
-					#             Note: The gamma in sRGB is 2.2 in overall but it doesn't use
-					#             this fixed gamma, because sRGB uses different gamma sections
-					#             (linear and non-linear). If sRGB is specified with a fixed
-					#             gamma = 1.0, it means that this is Linear sRGB.
-					# BYTE[8]     Reserved (set to zero)
-					# + If type = ICC:
-					#   DWORD     ICC profile data length
-					#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
-
-					color_profile_chunk.type = _reader.get_word()
-					color_profile_chunk.flags = _reader.get_word()
-					color_profile_chunk.fixed_gamma = _reader.get_fixed()
-					_reader.skip(8)
-
-					if color_profile_chunk.type == 2:
-						var icc_data_len := _reader.get_dword()
-
-						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							color_profile_chunk.icc_data = _reader.get_buffer(icc_data_len)
-						else:
-							_reader.skip(icc_data_len)
-
-				# External Files Chunk
-				0x2008:
-					var external_files_chunk := ExternalFiles.new()
-
-					frame.chunks.append(external_files_chunk)
-
-					external_files_chunk.chunk_size = current_chunk_size
-					external_files_chunk.chunk_type = current_chunk_type
-
-					# DWORD       Number of entries
-					# BYTE[8]     Reserved (set to zero)
-					# + For each entry
-					#   DWORD     Entry ID (this ID is referenced by tilesets, palettes, or extended properties)
-					#   BYTE      Type
-					#               0 - External palette
-					#               1 - External tileset
-					#               2 - Extension name for properties
-					#               3 - Extension name for tile management (can exist one per sprite)
-					#   BYTE[7]   Reserved (set to zero)
-					#   STRING    External file name or extension ID (see NOTE.4)
-
-					external_files_chunk.files_count = _reader.get_dword()
-					_reader.skip(8) # Skip 8 bytes for future use
-
-					for _file_index in range(external_files_chunk.files_count):
-						var external_file := ExternalFile.new()
-
-						external_files_chunk.files.append(external_file)
-
-						external_file.id = _reader.get_dword()
-						external_file.type = _reader.get_byte()
-						_reader.skip(7) # Skip 7 bytes for future use
-						external_file.name = _reader.get_string()
-
-				# Tags Chunk
-				0x2018:
-					var tags_chunk := Tags.new()
-
-					self.tags.append(tags_chunk)
-					frame.chunks.append(tags_chunk)
-
-					tags_chunk.chunk_size = current_chunk_size
-					tags_chunk.chunk_type = current_chunk_type
-
-					# WORD        Number of tags
-					# BYTE[8]     For future (set to zero)
-					# + For each tag
-					#   WORD      From frame
-					#   WORD      To frame
-					#   BYTE      Loop animation direction
-					#               0 = Forward
-					#               1 = Reverse
-					#               2 = Ping-pong
-					#               3 = Ping-pong Reverse
-					#   WORD      Repeat N times. Play this animation section N times:
-					#               0 = Doesn't specify (plays infinite in UI, once on export,
-					#                   for ping-pong it plays once in each direction)
-					#               1 = Plays once (for ping-pong, it plays just in one direction)
-					#               2 = Plays twice (for ping-pong, it plays once in one direction,
-					#                   and once in reverse)
-					#               n = Plays N times
-					#   BYTE[6]   For future (set to zero)
-					#   BYTE[3]   RGB values of the tag color
-					#               Deprecated, used only for backward compatibility with Aseprite v1.2.x
-					#               The color of the tag is the one in the user data field following
-					#               the tags chunk
-					#   BYTE      Extra byte (zero)
-					#   STRING    Tag name
-
-					tags_chunk.tags_count = _reader.get_word()
-					_reader.skip(8) # Skip 8 bytes for future use
-
-					for _tag_index in range(tags_chunk.tags_count):
-						var tag := Tag.new()
-
-						tags_chunk.tags.append(tag)
-
-						tag.from_frame = _reader.get_word()
-						tag.to_frame = _reader.get_word()
-						tag.loop_direction = _reader.get_byte()
-						tag.repeat = _reader.get_word()
-						_reader.skip(6) # Skip 6 bytes for future use
-						tag.color_r = _reader.get_byte()
-						tag.color_g = _reader.get_byte()
-						tag.color_b = _reader.get_byte()
-						_reader.skip(1) # Skip 1 byte for future use
-						tag.name = _reader.get_string()
-
-				# Palette Chunk
-				0x2019:
-					var palette_chunk = Palette.new()
-
-					self.palette = palette_chunk
-					frame.chunks.append(palette_chunk)
-
-					palette_chunk.chunk_size = current_chunk_size
-					palette_chunk.chunk_type = current_chunk_type
-
-					# DWORD       New palette size (total number of entries)
-					# DWORD       First color index to change
-					# DWORD       Last color index to change
-					# BYTE[8]     For future (set to zero)
-					# + For each palette entry in [from,to] range (to-from+1 entries)
-					#   WORD      Entry flags
-					#   BYTE      Red (0-255)
-					#   BYTE      Green (0-255)
-					#   BYTE      Blue (0-255)
-					#   BYTE      Alpha (0-255)
-					#   + If has name bit in entry flags
-					#     STRING  Color name
-
-					palette_chunk.colors_count = _reader.get_dword()
-					palette_chunk.first_color = _reader.get_dword()
-					palette_chunk.last_color = _reader.get_dword()
-					_reader.skip(8) # Skip 8 bytes for future use
-
-					# Read the palette colors
-
-					for _palette_index in range(palette_chunk.colors_count):
-						var palette_color := PaletteColor.new()
-
-						palette_chunk.colors.append(palette_color)
-
-						palette_color.flags = _reader.get_word()
-						palette_color.red = _reader.get_byte()
-						palette_color.green = _reader.get_byte()
-						palette_color.blue = _reader.get_byte()
-						palette_color.alpha = _reader.get_byte()
-
-						if palette_color.flags & PALETTE_COLOR_FLAG_HAS_NAME:
-							palette_color.name = _reader.get_string()
-
-				# Slice Chunk
-				0x2022:
-					var slice_chunk := Slice.new()
-
-					frame.chunks.append(slice_chunk)
-
-					slice_chunk.chunk_size = current_chunk_size
-					slice_chunk.chunk_type = current_chunk_type
-
-					# DWORD       Number of "slice keys"
-					# DWORD       Flags
-					#               1 = It's a 9-patches slice
-					#               2 = Has pivot information
-					# DWORD       Reserved
-					# STRING      Name
-					# + For each slice key
-					#   DWORD     Frame number (this slice is valid from
-					#             this frame to the end of the animation)
-					#   LONG      Slice X origin coordinate in the sprite
-					#   LONG      Slice Y origin coordinate in the sprite
-					#   DWORD     Slice width (can be 0 if this slice hidden in the
-					#             animation from the given frame)
-					#   DWORD     Slice height
-					#   + If flags have bit 1
-					#     LONG    Center X position (relative to slice bounds)
-					#     LONG    Center Y position
-					#     DWORD   Center width
-					#     DWORD   Center height
-					#   + If flags have bit 2
-					#     LONG    Pivot X position (relative to the slice origin)
-					#     LONG    Pivot Y position (relative to the slice origin)
-
-					slice_chunk.keys_count = _reader.get_dword()
-					slice_chunk.flags = _reader.get_dword()
-					_reader.skip(4) # Skip 4 bytes for future use
-					slice_chunk.name = _reader.get_string()
-
-					for _key_index in range(slice_chunk.keys_count):
-						var slice_key := SliceKey.new()
-
-						slice_chunk.keys.append(slice_key)
-
-						slice_key.frame_number = _reader.get_dword()
-						slice_key.origin_x = _reader.get_long()
-						slice_key.origin_y = _reader.get_long()
-						slice_key.width = _reader.get_dword()
-						slice_key.height = _reader.get_dword()
-
-						if slice_chunk.flags & 1 != 0:
-							slice_key.center_x = _reader.get_long()
-							slice_key.center_y = _reader.get_long()
-							slice_key.center_width = _reader.get_dword()
-							slice_key.center_height = _reader.get_dword()
-
-						if slice_chunk.flags & 2 != 0:
-							slice_key.pivot_x = _reader.get_long()
-							slice_key.pivot_y = _reader.get_long()
-
-				# Tileset Chunk
-				0x2023:
-					var tileset_chunk := Tileset.new()
-
-					frame.chunks.append(tileset_chunk)
-					self.tilesets.append(tileset_chunk)
-
-					tileset_chunk.chunk_size = current_chunk_size
-					tileset_chunk.chunk_type = current_chunk_type
-
-					tileset_chunk.id = _reader.get_dword()
-					tileset_chunk.flags = _reader.get_dword()
-					tileset_chunk.tiles_count = _reader.get_dword()
-					tileset_chunk.tile_width = _reader.get_word()
-					tileset_chunk.tile_height = _reader.get_word()
-					tileset_chunk.base_index = _reader.get_word()
-					_reader.skip(14)
-					tileset_chunk.name = _reader.get_string()
-
-					if tileset_chunk.flags & 1 != 0:
-						tileset_chunk.external_file_id = _reader.get_word()
-						tileset_chunk.external_id = _reader.get_word()
-
-					if tileset_chunk.flags & 2 != 0:
-						var data_len := _reader.get_dword()
-
-						if flags & OPEN_FLAG_SKIP_BUFFER == 0:
-							tileset_chunk.buffer = _reader.get_buffer(data_len)
-
-							# ZLIB compressed buffer
-							tileset_chunk.buffer = tileset_chunk.buffer.decompress(tileset_chunk.tile_width * tileset_chunk.tile_height * (self.color_depth / 8) * tileset_chunk.tiles_count, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
-						else:
-							_reader.skip(data_len)
-
-				_:
-					# Ignore unsupported chunk types
-					_reader.skip(current_chunk_size - 6)
-
-					var unknown_chunk := UnsupportedChunk.new()
-
-					frame.chunks.append(unknown_chunk)
-
-					unknown_chunk.chunk_size = current_chunk_size
-					unknown_chunk.chunk_type = current_chunk_type
-
-	# Sanity check, make sure we have read the entire file
-	if fs.get_position() != self.file_size:
-		return ERR_FILE_EOF
-
-	self.frames = frames
-
-	for frame in frames:
-		for chunk in frame.chunks:
-			if chunk is AsepriteFile.Layer:
-				self.layers.append(chunk)
-
-	return OK
-
-## Closes the currently opened file and prevents subsequent read.
-func close() -> void:
-	if _reader: _reader.close()
 
 ## Determines if the layer frame is empty.
 ## A layer frame is considered empty if it has no cel for that specified frame.
@@ -949,6 +416,23 @@ static func create_raw_image_from_data(width: int, height: int, color_depth: int
 		data,
 	)
 
+static var _last_open_error: Error = OK
+
+## Returns the result of the last `open()` call in the current thread.
+static func get_open_error() -> Error:
+	return _last_open_error
+
+## Opens the Aseprite file for reading.
+## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
+static func open(path: String, flags: AsepriteReader.ReadFlags = AsepriteReader.ReadFlags.DECOMPRESS) -> AsepriteFile:
+	var reader := AsepriteReader.new()
+	_last_open_error = reader.open(path, flags)
+
+	if _last_open_error != OK:
+		return null
+
+	return reader.read_ase(flags)
+
 ## Represent a single frame.
 class Frame extends RefCounted:
 	const MAGIC_NUMBER := 0xF1FA
@@ -972,6 +456,7 @@ class Frame extends RefCounted:
 	var chunks_num_new: int = 0
 
 	var chunks: Array[Chunk] = []
+
 	var cels: Array[Cel] = []
 
 	func get_chunks_count() -> int:
@@ -1121,14 +606,17 @@ class Layer extends Chunk:
 	var tileset_index: int = -1
 	var uuid: String = ""
 
-	func is_visible() -> bool:
-		return (self.flags & 1) != 0
+	func is_normal_layer() -> bool: return self.type == Layer.Type.NORMAL
+	func is_group_layer() -> bool: return self.type == Layer.Type.GROUP
+	func is_tilemap_layer() -> bool: return self.type == Layer.Type.TILEMAP
 
-	func is_hidden() -> bool:
-		return not self.is_visible()
+	func has_flag(flag: Flags) -> bool: return (self.flags & flag) != 0
 
-	func is_group() -> bool:
-		return self.type == 1
+	func is_visible() -> bool: return (self.flags & Layer.Flags.VISIBLE) != 0
+	func is_hidden() -> bool: return not self.is_visible()
+	func is_editable() -> bool: return (self.flags & Layer.Flags.EDITABLE) != 0
+	func is_background() -> bool: return (self.flags & Layer.Flags.BACKGROUND) != 0
+	func is_reference_layer() -> bool: return (self.flags & Layer.Flags.REFERENCE_LAYER) != 0
 
 ## 0x2005
 class Cel extends Chunk:
@@ -1356,17 +844,18 @@ class UnsupportedChunk extends Chunk:
 # FileAccess does not extend StreamPeer...
 # Additionally, get_xxx() do not return an error if the stream is empty
 # we are supposed to check get_available_bytes() first
-# however i am unusre if get_available_bytes() == 0 means we cant read no more
-class AseReader extends RefCounted:
+# however i am unsure if get_available_bytes() == 0 means we cant read no more
+class AsepriteReader extends RefCounted:
 	enum ReadFlags {
 		SKIP_BUFFER = 1 << 0,
 		DECOMPRESS = 1 << 1,
 	}
 
-
 	var _stream: Variant = null
+	var _flags: ReadFlags = 0
 
-	func open(data: Variant) -> Error:
+	## Open a file or stream for reading.
+	func open(data: Variant, flags: ReadFlags = ReadFlags.DECOMPRESS) -> Error:
 		if data is FileAccess:
 			data.big_endian = false
 			_stream = data
@@ -1396,11 +885,14 @@ class AseReader extends RefCounted:
 		else:
 			return ERR_INVALID_PARAMETER
 
+	## Closes the underlying resources used by this instance.
 	func close() -> Error:
 		if _stream is FileAccess: _stream.close()
+		if _stream: _stream.free()
 		_stream = null
 		return OK
 
+	## Returns the number of bytes available.
 	func get_available_bytes() -> int:
 		if _stream is FileAccess: return _stream.get_length() - _stream.get_position()
 		if _stream is StreamPeer: return _stream.get_available_bytes()
@@ -1454,81 +946,86 @@ class AseReader extends RefCounted:
 
 		return 0
 
-	## An 8-bit unsigned integer value
+	## Read a 8-bit unsigned integer value
 	func get_byte() -> int:
 		if _stream is FileAccess: return _stream.get_8()
 		if _stream is StreamPeer: return _stream.get_8()
 		return -1
 
-	## A 16-bit unsigned integer value
+	## Read a 16-bit unsigned integer value
 	func get_word() -> int:
 		if _stream is FileAccess: return _stream.get_16()
 		if _stream is StreamPeer: return _stream.get_16()
 		return -1
 
-	## A 32-bit unsigned integer value
+	## Read a 32-bit unsigned integer value
 	func get_dword() -> int:
 		if _stream is FileAccess: return _stream.get_32()
 		if _stream is StreamPeer: return _stream.get_32()
 		return -1
 
-	## A 16-bit signed integer value
+	## Read a 16-bit signed integer value
 	func get_short() -> int:
 		if _stream is FileAccess: return _stream.get_16()
 		if _stream is StreamPeer: return _stream.get_16()
 		return -1
 
-	## A 32-bit signed integer value
+	## Read a 32-bit signed integer value
 	func get_long() -> int:
 		if _stream is FileAccess: return _stream.get_32()
 		if _stream is StreamPeer: return _stream.get_32()
 		return -1
 
-	## A 32-bit fixed point (16.16) value
+	## Read a 32-bit fixed point (16.16) value
 	func get_fixed() -> float:
 		if _stream is FileAccess: return _stream.get_32() << 16
 		if _stream is StreamPeer: return _stream.get_32() << 16
 		return 0.0
 
-	## A 32-bit single-precision value
+	## Read a 32-bit single-precision value
 	func get_float() -> float:
 		if _stream is FileAccess: return _stream.get_float()
 		if _stream is StreamPeer: return _stream.get_float()
 		return 0.0
 
-	## A 64-bit double-precision value
+	## Read a 64-bit double-precision value
 	func get_double() -> float:
 		if _stream is FileAccess: return _stream.get_double()
 		if _stream is StreamPeer: return _stream.get_double()
 		return 0.0
 
-	## A 64-bit unsigned integer value
+	## Read a 64-bit unsigned integer value
 	func get_qword() -> int:
 		if _stream is FileAccess: return _stream.get_64()
 		if _stream is StreamPeer: return _stream.get_64()
 		return -1
 
-	## A 64-bit signed integer value
+	## Read a 64-bit signed integer value
 	func get_long64() -> int:
 		if _stream is FileAccess: return _stream.get_64()
 		if _stream is StreamPeer: return _stream.get_64()
 		return -1
 
+	## Read a string prefixed with a 16-bit length
 	func get_string() -> String:
 		return get_buffer(get_word()).get_string_from_utf8()
 
+	## Read a buffer of given length
 	func get_buffer(length: int) -> PackedByteArray:
 		if _stream is FileAccess: return _stream.get_buffer(length)
 		# TODO: [0] is error, [1] is data, return the error also
 		if _stream is StreamPeer: return _stream.get_data(length)[1]
 		return PackedByteArray()
 
+	## Read a point (LONG, LONG)
 	func get_point() -> Vector2:
 		return Vector2(get_long(), get_long())
 
+	## Read a size (LONG, LONG)
 	func get_size() -> Vector2:
 		return Vector2(get_long(), get_long())
 
+	## Read a rect (LONG, LONG, LONG, LONG)
 	func get_rect() -> Rect2:
 		return Rect2(get_long(), get_long(), get_long(), get_long())
 
@@ -1555,6 +1052,7 @@ class AseReader extends RefCounted:
 
 		return [0, 0, 0, 0]
 
+	## Read a UUID (16 bytes) and return it as a lowercased hex string
 	func get_uuid() -> String:
 		var buf := get_buffer(16)
 
@@ -1643,14 +1141,14 @@ class AseReader extends RefCounted:
 	# WORD        Frame duration (in milliseconds)
 	# BYTE[2]     For future (set to zero)
 	# DWORD       New field which specifies the number of "chunks" in this frame (if this is 0, use the old field)
-	func read_frame() -> Frame:
-		var frame := Frame.new()
+	func read_frame() -> AsepriteFile.Frame:
+		var frame := AsepriteFile.Frame.new()
 
 		frame.frame_size = get_dword()
 		frame.magic_number = get_word()
 
 		# Do not read past the magic number if it's invalid
-		if frame.magic_number != Frame.MAGIC_NUMBER:
+		if frame.magic_number != AsepriteFile.Frame.MAGIC_NUMBER:
 			# push_warning("Aseprite - Invalid frame magic number")
 			return frame
 
@@ -1685,8 +1183,8 @@ class AseReader extends RefCounted:
 	#   DWORD     Tileset index
 	# + If file header flags have bit 4:
 	#   UUID      Layer's universally unique identifier
-	func read_layer_chunk(header: ChunkHeader) -> Layer:
-		var layer := Layer.new()
+	func read_layer_chunk(header: ChunkHeader) -> AsepriteFile.Layer:
+		var layer := AsepriteFile.Layer.new()
 
 		layer.chunk_size = header.size if header else 0
 		layer.chunk_type = header.type if header else 0
@@ -1737,8 +1235,8 @@ class AseReader extends RefCounted:
 	#   DWORD     Bitmask for diagonal flip (swap X/Y axis)
 	#   BYTE[10]  Reserved
 	#   TILE[]    Row by row, from top to bottom tile by tile compressed with ZLIB method (see NOTE.3)
-	func read_cel_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> Cel:
-		var cel := Cel.new()
+	func read_cel_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> AsepriteFile.Cel:
+		var cel := AsepriteFile.Cel.new()
 
 		cel.chunk_size = header.size if header else 0
 		cel.chunk_type = header.type if header else 0
@@ -1785,8 +1283,8 @@ class AseReader extends RefCounted:
 	#     FIXED       Width of the cel in the sprite (scaled in real-time)
 	#     FIXED       Height of the cel in the sprite
 	#     BYTE[16]    For future use (set to zero)
-	func read_cel_extra_chunk(header: ChunkHeader) -> CelExtra:
-		var cel_extra := CelExtra.new()
+	func read_cel_extra_chunk(header: ChunkHeader) -> AsepriteFile.CelExtra:
+		var cel_extra := AsepriteFile.CelExtra.new()
 
 		cel_extra.chunk_size = header.size if header else 0
 		cel_extra.chunk_type = header.type if header else 0
@@ -1808,8 +1306,8 @@ class AseReader extends RefCounted:
 	# + If type = ICC:
 	#   DWORD     ICC profile data length
 	#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
-	func read_color_profile_chunk(header: ChunkHeader, flags: ReadFlags = 0) -> ColorProfile:
-		var color_profile := ColorProfile.new()
+	func read_color_profile_chunk(header: ChunkHeader, flags: ReadFlags = 0) -> AsepriteFile.ColorProfile:
+		var color_profile := AsepriteFile.ColorProfile.new()
 
 		color_profile.chunk_size = header.size if header else 0
 		color_profile.chunk_type = header.type if header else 0
@@ -1833,8 +1331,8 @@ class AseReader extends RefCounted:
 	#   BYTE      Type
 	#   BYTE[7]   Reserved (set to zero)
 	#   STRING    External file name or extension ID (see NOTE.4)
-	func read_external_files_chunk(header: ChunkHeader) -> ExternalFiles:
-		var external_files := ExternalFiles.new()
+	func read_external_files_chunk(header: ChunkHeader) -> AsepriteFile.ExternalFiles:
+		var external_files := AsepriteFile.ExternalFiles.new()
 
 		external_files.chunk_size = header.size if header else 0
 		external_files.chunk_type = header.type if header else 0
@@ -1843,7 +1341,7 @@ class AseReader extends RefCounted:
 		skip(8)
 
 		for i in range(external_files.files_count):
-			var file := ExternalFile.new()
+			var file := AsepriteFile.ExternalFile.new()
 
 			file.id = get_dword()
 			file.type = get_byte()
@@ -1866,8 +1364,8 @@ class AseReader extends RefCounted:
 	#   BYTE[3]   RGB values of the tag color
 	#   BYTE      Extra byte (zero)
 	#   STRING    Tag name
-	func read_tags_chunk(header: ChunkHeader) -> Tags:
-		var tags := Tags.new()
+	func read_tags_chunk(header: ChunkHeader) -> AsepriteFile.Tags:
+		var tags := AsepriteFile.Tags.new()
 
 		tags.chunk_size = header.size if header else 0
 		tags.chunk_type = header.type if header else 0
@@ -1876,7 +1374,7 @@ class AseReader extends RefCounted:
 		skip(8)
 
 		for i in range(tags.tags_count):
-			var tag := Tag.new()
+			var tag := AsepriteFile.Tag.new()
 
 			tag.from_frame = get_word()
 			tag.to_frame = get_word()
@@ -1906,8 +1404,8 @@ class AseReader extends RefCounted:
 	#   BYTE      Alpha (0-255)
 	#   + If has name bit in entry flags
 	#     STRING  Color name
-	func read_palette_chunk(header: ChunkHeader) -> Palette:
-		var palette := Palette.new()
+	func read_palette_chunk(header: ChunkHeader) -> AsepriteFile.Palette:
+		var palette := AsepriteFile.Palette.new()
 
 		palette.chunk_size = header.size if header else 0
 		palette.chunk_type = header.type if header else 0
@@ -1918,7 +1416,7 @@ class AseReader extends RefCounted:
 		skip(8)
 
 		for i in range(palette.colors_count):
-			var color := PaletteColor.new()
+			var color := AsepriteFile.PaletteColor.new()
 
 			color.flags = get_word()
 			color.red = get_byte()
@@ -1926,7 +1424,7 @@ class AseReader extends RefCounted:
 			color.blue = get_byte()
 			color.alpha = get_byte()
 
-			if color.flags & PaletteColor.Flags.HAS_NAME != 0:
+			if color.flags & AsepriteFile.PaletteColor.Flags.HAS_NAME != 0:
 				color.name = get_string()
 
 			palette.colors.append(color)
@@ -1952,8 +1450,8 @@ class AseReader extends RefCounted:
 	#   + If flags have bit 2
 	#     LONG    Pivot X position (relative to the slice origin)
 	#     LONG    Pivot Y position (relative to the slice origin)
-	func read_slice_chunk(header: ChunkHeader) -> Slice:
-		var slice := Slice.new()
+	func read_slice_chunk(header: ChunkHeader) -> AsepriteFile.Slice:
+		var slice := AsepriteFile.Slice.new()
 
 		slice.chunk_size = header.size if header else 0
 		slice.chunk_type = header.type if header else 0
@@ -1964,7 +1462,7 @@ class AseReader extends RefCounted:
 		slice.name = get_string()
 
 		for i in range(slice.keys_count):
-			var key := SliceKey.new()
+			var key := AsepriteFile.SliceKey.new()
 
 			key.frame_number = get_dword()
 			key.origin_x = get_long()
@@ -1972,13 +1470,13 @@ class AseReader extends RefCounted:
 			key.width = get_dword()
 			key.height = get_dword()
 
-			if slice.flags & Slice.Flags.NINE_PATCHES != 0:
+			if slice.flags & AsepriteFile.Slice.Flags.NINE_PATCHES != 0:
 				key.center_x = get_long()
 				key.center_y = get_long()
 				key.center_width = get_dword()
 				key.center_height = get_dword()
 
-			if slice.flags & Slice.Flags.HAS_PIVOT != 0:
+			if slice.flags & AsepriteFile.Slice.Flags.HAS_PIVOT != 0:
 				key.pivot_x = get_long()
 				key.pivot_y = get_long()
 
@@ -1987,22 +1485,22 @@ class AseReader extends RefCounted:
 		return slice
 
 	# 0x2023
-    # DWORD       Tileset ID
-    # DWORD       Tileset flags
-    # DWORD       Number of tiles
-    # WORD        Tile Width
-    # WORD        Tile Height
-    # SHORT       Base Index: Number to show in the screen from the tile with index 1 and so on (by default this is field is 1, so the data that is displayed is equivalent to the data in memory). But it can be 0 to display zero-based indexing (this field isn't used for the representation of the data in the file, it's just for UI purposes).
-    # BYTE[14]    Reserved
-    # STRING      Name of the tileset
-    # + If flag 1 is set
-    #   DWORD     ID of the external file. This ID is one entry of the the External Files Chunk.
-    #   DWORD     Tileset ID in the external file
-    # + If flag 2 is set
-    #   DWORD     Data length of the compressed Tileset image
-    #   PIXEL[]   Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
-	func read_tileset_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> Tileset:
-		var tileset := Tileset.new()
+	# DWORD       Tileset ID
+	# DWORD       Tileset flags
+	# DWORD       Number of tiles
+	# WORD        Tile Width
+	# WORD        Tile Height
+	# SHORT       Base Index: Number to show in the screen from the tile with index 1 and so on (by default this is field is 1, so the data that is displayed is equivalent to the data in memory). But it can be 0 to display zero-based indexing (this field isn't used for the representation of the data in the file, it's just for UI purposes).
+	# BYTE[14]    Reserved
+	# STRING      Name of the tileset
+	# + If flag 1 is set
+	#   DWORD     ID of the external file. This ID is one entry of the the External Files Chunk.
+	#   DWORD     Tileset ID in the external file
+	# + If flag 2 is set
+	#   DWORD     Data length of the compressed Tileset image
+	#   PIXEL[]   Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
+	func read_tileset_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> AsepriteFile.Tileset:
+		var tileset := AsepriteFile.Tileset.new()
 
 		tileset.chunk_size = header.size if header else 0
 		tileset.chunk_type = header.type if header else 0
@@ -2026,8 +1524,8 @@ class AseReader extends RefCounted:
 
 		return tileset
 
-	func read_empty_chunk(header: ChunkHeader) -> UnsupportedChunk:
-		var chunk := UnsupportedChunk.new()
+	func read_empty_chunk(header: ChunkHeader) -> AsepriteFile.UnsupportedChunk:
+		var chunk := AsepriteFile.UnsupportedChunk.new()
 
 		chunk.chunk_size = header.size if header else 0
 		chunk.chunk_type = header.type if header else 0
@@ -2036,18 +1534,18 @@ class AseReader extends RefCounted:
 
 		return chunk
 
-	func read_chunk(header: AsepriteFile, flags: ReadFlags = ReadFlags.DECOMPRESS) -> Chunk:
+	func read_chunk(header: AsepriteFile, flags: ReadFlags = 0) -> AsepriteFile.Chunk:
 		var chunk_header := read_chunk_header()
 		var color_depth := header.color_depth
 
-		match header.type:
-			AsepriteFile.Chunk.ChunkType.PALETTE: return read_palette_chunk(chunk_header)
+		match chunk_header.type:
 			AsepriteFile.Chunk.ChunkType.LAYER: return read_layer_chunk(chunk_header)
 			AsepriteFile.Chunk.ChunkType.CEL: return read_cel_chunk(chunk_header, color_depth, flags)
 			AsepriteFile.Chunk.ChunkType.CEL_EXTRA: return read_cel_extra_chunk(chunk_header)
 			AsepriteFile.Chunk.ChunkType.COLOR_PROFILE: return read_color_profile_chunk(chunk_header, flags)
 			AsepriteFile.Chunk.ChunkType.EXTERNAL_FILES: return read_external_files_chunk(chunk_header)
 			AsepriteFile.Chunk.ChunkType.TAGS: return read_tags_chunk(chunk_header)
+			AsepriteFile.Chunk.ChunkType.PALETTE: return read_palette_chunk(chunk_header)
 			AsepriteFile.Chunk.ChunkType.SLICE: return read_slice_chunk(chunk_header)
 			AsepriteFile.Chunk.ChunkType.TILESET: return read_tileset_chunk(chunk_header, color_depth, flags)
 			_: return read_empty_chunk(chunk_header)
@@ -2058,37 +1556,37 @@ class AseReader extends RefCounted:
 		if ase.magic_number != AsepriteFile.MAGIC_NUMBER:
 			return ase
 
-		var frames: Array[Frame] = []
-		var layers: Array[Layer] = []
-		var tilesets: Array[Tileset] = []
-		var tags: Array[Tag] = []
-
 		for __ in range(ase.num_frames):
 			var frame := read_frame()
 
-			if frame.magic_number != Frame.MAGIC_NUMBER:
+			if frame.magic_number != AsepriteFile.Frame.MAGIC_NUMBER:
 				return ase
 
-			frames.append(frame)
+			ase.frames.append(frame)
 
 			for ___ in range(frame.get_chunks_count()):
 				frame.chunks.append(read_chunk(ase, flags))
 
-		frames.make_read_only()
-
-		for frame in frames:
+		for frame in ase.frames:
 			for chunk in frame.chunks:
-				if chunk is AsepriteFile.Layer: layers.append(chunk)
-				elif chunk is AsepriteFile.Tileset: tilesets.append(chunk)
-				elif chunk is AsepriteFile.Tags: tags.append(chunk)
+				if chunk is AsepriteFile.Layer: ase.layers.append(chunk)
 				elif chunk is AsepriteFile.Cel: frame.cels.append(chunk)
-				elif chunk is AsepriteFile.Palette: ase.palette = chunk
+				elif chunk is AsepriteFile.CelExtra: frame.cels[frame.cels.size() - 1].extra = chunk
+				elif chunk is AsepriteFile.ExternalFiles: ase.external_files = chunk.files
 				elif chunk is AsepriteFile.ColorProfile: ase.color_profile = chunk
+				elif chunk is AsepriteFile.Tags: ase.tags.append(chunk)
+				elif chunk is AsepriteFile.Palette: ase.palette = chunk
+				elif chunk is AsepriteFile.Tileset: ase.tilesets.append(chunk)
 
-		ase.frames = frames
-		ase.layers = layers
-		ase.tilesets = tilesets
-		ase.tags = tags
+		ase.frames.make_read_only()
+		ase.layers.make_read_only()
+		ase.tilesets.make_read_only()
+		ase.tags.make_read_only()
+		ase.external_files.make_read_only()
+
+		for frame in ase.frames:
+			frame.chunks.make_read_only()
+			frame.cels.make_read_only()
 
 		return ase
 
