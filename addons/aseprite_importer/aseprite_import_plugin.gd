@@ -37,7 +37,7 @@ func _get_import_options(path: String, preset_index: int) -> Array:
 	_options = _get_presets()[preset_index]["options"].duplicate(true)
 
 	_configuring_options = true
-	_configure_input_options(path, preset_index)
+	_configure_import_options(path, preset_index)
 	_configuring_options = false
 
 	var options = _options.duplicate()
@@ -48,7 +48,7 @@ func _get_import_options(path: String, preset_index: int) -> Array:
 func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
 	return true
 
-func _configure_input_options(path: String, preset_index: int) -> void:
+func _configure_import_options(path: String, preset_index: int) -> void:
 	pass
 
 # see: https://github.com/godotengine/godot/blob/17fb6e3bd06f6425ad9ec0d93718ce8f848fc3fc/editor/import/editor_import_plugin.cpp#L120
@@ -58,7 +58,7 @@ func _configure_input_options(path: String, preset_index: int) -> void:
 # "hint_string"
 # "usage" = PROPERTY_USAGE_DEFAULT
 func add_import_option(value: Dictionary) -> void:
-	assert(_configuring_options, "add_import_option can only be called from _configure_input_options")
+	assert(_configuring_options, "add_import_option can only be called from _configure_import_options")
 	_options.append(value)
 
 func add_import_option_layer(ase: AsepriteFile, layer: AsepriteFile.Layer, value: Dictionary) -> void:

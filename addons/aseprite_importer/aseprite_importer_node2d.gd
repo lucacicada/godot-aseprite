@@ -26,7 +26,7 @@ func _configure_presets() -> void:
 		}
 	])
 
-func _configure_input_options(path: String, preset_index: int) -> void:
+func _configure_import_options(path: String, preset_index: int) -> void:
 	var ase := AsepriteFile.open(path, AsepriteFile.OPEN_FLAGS_SKIP_BUFFER)
 
 	if ase == null:

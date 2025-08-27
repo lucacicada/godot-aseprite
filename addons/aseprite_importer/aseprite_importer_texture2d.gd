@@ -1,53 +1,25 @@
 @tool
 extends EditorImportPlugin
 
-var presets := [
-	{
-		"name": "Default",
-		"options": [
-			{
-				"name": "external/path",
-				"default_value": "",
-				"property_hint": PROPERTY_HINT_SAVE_FILE,
-				"hint_string": "*.png",
-			}
-		]
-	},
-]
-
-func _get_importer_name() -> String:
-	return "aseprite.importer.texture2d"
-
-func _get_visible_name() -> String:
-	return "Texture2D (Aseprite)"
-
-func _get_recognized_extensions() -> PackedStringArray:
-	return ["aseprite", "ase"]
-
-func _get_resource_type() -> String:
-	return "Texture2D"
-
-func _get_save_extension() -> String:
-	return "res"
-
-func _get_priority() -> float:
-	return 2.0
-
-func _get_import_order() -> int:
-	return IMPORT_ORDER_DEFAULT
-
-func _get_preset_count() -> int:
-	return presets.size()
-
-func _get_preset_name(preset_index: int) -> String:
-	return presets[preset_index]["name"]
-
-func _get_import_options(path: String, preset_index: int) -> Array:
-	var options: Array = presets[preset_index]["options"].duplicate(true)
-	return options
-
-func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
-	return true
+func _get_importer_name() -> String: return "aseprite.importer.texture2d"
+func _get_visible_name() -> String: return "Texture2D (Aseprite)"
+func _get_recognized_extensions() -> PackedStringArray: return ["aseprite", "ase"]
+func _get_resource_type() -> String: return "Texture2D"
+func _get_save_extension() -> String: return "res"
+func _get_priority() -> float: return 2.0
+func _get_import_order() -> int: return IMPORT_ORDER_DEFAULT
+func _get_preset_count() -> int: return 1
+func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool: return true
+func _get_preset_name(preset_index: int) -> String: return "Default"
+func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
+	return [
+		{
+			"name": "external/path",
+			"default_value": "",
+			"property_hint": PROPERTY_HINT_SAVE_FILE,
+			"hint_string": "*.png",
+		}
+	]
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
