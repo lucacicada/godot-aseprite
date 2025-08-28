@@ -4,6 +4,13 @@
 
 Aseprite file parser for Godot Engine.
 
+```gdscript
+var ase := AsepriteFile.open("res://path/to/file.aseprite")
+if ase == null:
+    push_warning("Failed to open: %s" % error_string(AsepriteFile.get_open_error()))
+    return
+```
+
 ## Supported Chunks
 - [x] Layer Chunk [0x2004]
 - [x] Cel Chunk [0x2005]
@@ -39,12 +46,6 @@ Deprecated chunks are present in the spec but unused by Aseprite.
 The script is in a single GDScript file [addons/aseprite_file/aseprite_file.gd](addons/aseprite_file/aseprite_file.gd)
 
 You can use it as a plugin or copy the file in your project.
-
-## ERR_FILE_CORRUPT
-
-The parser perform several strict checks to ensure the file is valid.
-At the moment, it return a generic `ERR_FILE_CORRUPT` error if the file is malformed.
-In the future, a warning message will be printed.
 
 ## Security note
 

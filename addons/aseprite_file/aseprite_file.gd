@@ -1,67 +1,67 @@
 ## This class is used to read Aseprite files and extract metadata such as frames and layers.
 class_name AsepriteFile extends RefCounted
 
-const CHUNK_OLD_PALETTE_1 := Chunk.ChunkType.OLD_PALETTE_1
-const CHUNK_OLD_PALETTE_2 := Chunk.ChunkType.OLD_PALETTE_2
-const CHUNK_LAYER := Chunk.ChunkType.LAYER
-const CHUNK_CEL := Chunk.ChunkType.CEL
-const CHUNK_CEL_EXTRA := Chunk.ChunkType.CEL_EXTRA
-const CHUNK_COLOR_PROFILE := Chunk.ChunkType.COLOR_PROFILE
-const CHUNK_EXTERNAL_FILES := Chunk.ChunkType.EXTERNAL_FILES
-const CHUNK_MASK := Chunk.ChunkType.MASK
-const CHUNK_PATH := Chunk.ChunkType.PATH
-const CHUNK_TAGS := Chunk.ChunkType.TAGS
-const CHUNK_PALETTE := Chunk.ChunkType.PALETTE
-const CHUNK_USER_DATA := Chunk.ChunkType.USER_DATA
-const CHUNK_SLICE := Chunk.ChunkType.SLICE
-const CHUNK_TILESET := Chunk.ChunkType.TILESET
+const CHUNK_OLD_PALETTE_1 := ChunkType.OLD_PALETTE_1
+const CHUNK_OLD_PALETTE_2 := ChunkType.OLD_PALETTE_2
+const CHUNK_LAYER := ChunkType.LAYER
+const CHUNK_CEL := ChunkType.CEL
+const CHUNK_CEL_EXTRA := ChunkType.CEL_EXTRA
+const CHUNK_COLOR_PROFILE := ChunkType.COLOR_PROFILE
+const CHUNK_EXTERNAL_FILES := ChunkType.EXTERNAL_FILES
+const CHUNK_MASK := ChunkType.MASK
+const CHUNK_PATH := ChunkType.PATH
+const CHUNK_TAGS := ChunkType.TAGS
+const CHUNK_PALETTE := ChunkType.PALETTE
+const CHUNK_USER_DATA := ChunkType.USER_DATA
+const CHUNK_SLICE := ChunkType.SLICE
+const CHUNK_TILESET := ChunkType.TILESET
 
-const PALETTE_COLOR_FLAG_HAS_NAME := PaletteColor.Flags.HAS_NAME
+const PALETTE_COLOR_FLAG_HAS_NAME := PaletteColorFlags.HAS_NAME
 
-const LAYER_TYPE_NORMAL := Layer.Type.NORMAL
-const LAYER_TYPE_GROUP := Layer.Type.GROUP
-const LAYER_TYPE_TILEMAP := Layer.Type.TILEMAP
+const LAYER_TYPE_NORMAL := LayerType.NORMAL
+const LAYER_TYPE_GROUP := LayerType.GROUP
+const LAYER_TYPE_TILEMAP := LayerType.TILEMAP
 
-const LAYER_FLAG_VISIBLE := Layer.Flags.VISIBLE
-const LAYER_FLAG_EDITABLE := Layer.Flags.EDITABLE
-const LAYER_FLAG_LOCK_MOVEMENT := Layer.Flags.LOCK_MOVEMENT
-const LAYER_FLAG_BACKGROUND := Layer.Flags.BACKGROUND
-const LAYER_FLAG_PREFER_LINKED_CEL := Layer.Flags.PREFER_LINKED_CELS
-const LAYER_FLAG_GROUP_COLLAPSED := Layer.Flags.GROUP_COLLAPSED
-const LAYER_FLAG_REFERENCE_LAYER := Layer.Flags.REFERENCE_LAYER
+const LAYER_FLAG_VISIBLE := LayerFlags.VISIBLE
+const LAYER_FLAG_EDITABLE := LayerFlags.EDITABLE
+const LAYER_FLAG_LOCK_MOVEMENT := LayerFlags.LOCK_MOVEMENT
+const LAYER_FLAG_BACKGROUND := LayerFlags.BACKGROUND
+const LAYER_FLAG_PREFER_LINKED_CEL := LayerFlags.PREFER_LINKED_CELS
+const LAYER_FLAG_GROUP_COLLAPSED := LayerFlags.GROUP_COLLAPSED
+const LAYER_FLAG_REFERENCE_LAYER := LayerFlags.REFERENCE_LAYER
 
-const LAYER_BLEND_NORMAL := Layer.BlendMode.NORMAL
-const LAYER_BLEND_MULTIPLY := Layer.BlendMode.MULTIPLY
-const LAYER_BLEND_SCREEN := Layer.BlendMode.SCREEN
-const LAYER_BLEND_OVERLAY := Layer.BlendMode.OVERLAY
-const LAYER_BLEND_DARKEN := Layer.BlendMode.DARKEN
-const LAYER_BLEND_LIGHTEN := Layer.BlendMode.LIGHTEN
-const LAYER_BLEND_COLOR_DODGE := Layer.BlendMode.COLOR_DODGE
-const LAYER_BLEND_COLOR_BURN := Layer.BlendMode.COLOR_BURN
-const LAYER_BLEND_HARD_LIGHT := Layer.BlendMode.HARD_LIGHT
-const LAYER_BLEND_SOFT_LIGHT := Layer.BlendMode.SOFT_LIGHT
-const LAYER_BLEND_DIFFERENCE := Layer.BlendMode.DIFFERENCE
-const LAYER_BLEND_EXCLUSION := Layer.BlendMode.EXCLUSION
-const LAYER_BLEND_HUE := Layer.BlendMode.HUE
-const LAYER_BLEND_SATURATION := Layer.BlendMode.SATURATION
-const LAYER_BLEND_COLOR := Layer.BlendMode.COLOR
-const LAYER_BLEND_LUMINOSITY := Layer.BlendMode.LUMINOSITY
-const LAYER_BLEND_ADDITION := Layer.BlendMode.ADDITION
-const LAYER_BLEND_SUBTRACT := Layer.BlendMode.SUBTRACT
-const LAYER_BLEND_DIVIDE := Layer.BlendMode.DIVIDE
+const LAYER_BLEND_NORMAL := LayerBlendMode.NORMAL
+const LAYER_BLEND_MULTIPLY := LayerBlendMode.MULTIPLY
+const LAYER_BLEND_SCREEN := LayerBlendMode.SCREEN
+const LAYER_BLEND_OVERLAY := LayerBlendMode.OVERLAY
+const LAYER_BLEND_DARKEN := LayerBlendMode.DARKEN
+const LAYER_BLEND_LIGHTEN := LayerBlendMode.LIGHTEN
+const LAYER_BLEND_COLOR_DODGE := LayerBlendMode.COLOR_DODGE
+const LAYER_BLEND_COLOR_BURN := LayerBlendMode.COLOR_BURN
+const LAYER_BLEND_HARD_LIGHT := LayerBlendMode.HARD_LIGHT
+const LAYER_BLEND_SOFT_LIGHT := LayerBlendMode.SOFT_LIGHT
+const LAYER_BLEND_DIFFERENCE := LayerBlendMode.DIFFERENCE
+const LAYER_BLEND_EXCLUSION := LayerBlendMode.EXCLUSION
+const LAYER_BLEND_HUE := LayerBlendMode.HUE
+const LAYER_BLEND_SATURATION := LayerBlendMode.SATURATION
+const LAYER_BLEND_COLOR := LayerBlendMode.COLOR
+const LAYER_BLEND_LUMINOSITY := LayerBlendMode.LUMINOSITY
+const LAYER_BLEND_ADDITION := LayerBlendMode.ADDITION
+const LAYER_BLEND_SUBTRACT := LayerBlendMode.SUBTRACT
+const LAYER_BLEND_DIVIDE := LayerBlendMode.DIVIDE
 
-const CEL_TYPE_IMAGE := Cel.Type.IMAGE
-const CEL_TYPE_LINKED := Cel.Type.LINKED_CEL
-const CEL_TYPE_COMPRESSED_CEL := Cel.Type.COMPRESSED_CEL
-const CEL_TYPE_COMPRESSED_TILEMAP := Cel.Type.COMPRESSED_TILEMAP
+const CEL_TYPE_IMAGE := CelType.IMAGE
+const CEL_TYPE_LINKED := CelType.LINKED_CEL
+const CEL_TYPE_COMPRESSED_CEL := CelType.COMPRESSED_CEL
+const CEL_TYPE_COMPRESSED_TILEMAP := CelType.COMPRESSED_TILEMAP
 
-const CEL_EXTRA_FLAG_PRECISE_BOUNDS := CelExtra.Flags.PRECISE_BOUNDS
+const CEL_EXTRA_FLAG_PRECISE_BOUNDS := CelExtraFlags.PRECISE_BOUNDS
 
-const COLOR_PROFILE_TYPE_NONE := ColorProfile.Type.NO_PROFILE
-const COLOR_PROFILE_TYPE_SRGB := ColorProfile.Type.SRGB
-const COLOR_PROFILE_TYPE_ICC := ColorProfile.Type.EMBEDDED_ICC
+const COLOR_PROFILE_TYPE_NONE := ColorProfileType.NO_PROFILE
+const COLOR_PROFILE_TYPE_SRGB := ColorProfileType.SRGB
+const COLOR_PROFILE_TYPE_ICC := ColorProfileType.EMBEDDED_ICC
 
-const COLOR_PROFILE_FLAG_FIXED_GAMMA := ColorProfile.Flags.USE_FIXED_GAMMA
+const COLOR_PROFILE_FLAG_FIXED_GAMMA := ColorProfileFlags.USE_FIXED_GAMMA
 
 const OPEN_FLAGS_SKIP_BUFFER := AsepriteReader.ReadFlags.SKIP_BUFFER
 
@@ -146,53 +146,6 @@ var palette: Palette = Palette.new()
 
 ## The color profile used in the sprite.
 var color_profile: ColorProfile = ColorProfile.new()
-
-# func get_frames() -> Array[Frame]:
-# 	return self.frames.duplicate()
-
-# func get_chunks() -> Array[Chunk]:
-# 	var items: Array[Chunk] = []
-
-# 	for frame in self.frames:
-# 		items.append_array(frame.chunks)
-
-# 	return items
-
-# func get_layers() -> Array[Layer]:
-# 	var items: Array[Layer] = []
-
-# 	for frame in self.frames:
-# 		for chunk in frame.chunks:
-# 			if chunk is AsepriteFile.Layer:
-# 				items.append(chunk)
-
-# 	return items
-
-# func get_tilesets() -> Array[Tileset]:
-# 	var items: Array[Tileset] = []
-
-# 	for frame in self.frames:
-# 		for chunk in frame.chunks:
-# 			if chunk is AsepriteFile.Tileset:
-# 				items.append(chunk)
-
-# 	return items
-
-# func get_palette() -> Palette:
-# 	for frame in self.frames:
-# 		for chunk in frame.chunks:
-# 			if chunk is AsepriteFile.Palette:
-# 				return chunk
-
-# 	return Palette.new()
-
-# func get_color_profile() -> ColorProfile:
-# 	for frame in self.frames:
-# 		for chunk in frame.chunks:
-# 			if chunk is AsepriteFile.ColorProfile:
-# 				return chunk
-
-# 	return ColorProfile.new()
 
 ## Determines if the layer frame is empty.
 ## A layer frame is considered empty if it has no cel for that specified frame.
@@ -429,9 +382,24 @@ static func open(path: String, flags: AsepriteReader.ReadFlags = AsepriteReader.
 	_last_open_error = reader.open(path, flags)
 
 	if _last_open_error != OK:
+		reader.close()
 		return null
 
-	return reader.read_ase(flags)
+	var ase := reader.read_ase()
+
+	if ase.magic_number != MAGIC_NUMBER:
+		_last_open_error = ERR_FILE_CORRUPT
+		reader.close()
+		return null
+
+	for frame in ase.frames:
+		if frame.magic_number != Frame.MAGIC_NUMBER:
+			_last_open_error = ERR_FILE_CORRUPT
+			reader.close()
+			return null
+
+	return ase
+
 
 ## Represent a single frame.
 class Frame extends RefCounted:
@@ -440,6 +408,7 @@ class Frame extends RefCounted:
 	## Bytes in this frame
 	var frame_size: int = 0
 
+	## Magic number (should be 0xF1FA)
 	var magic_number: int = 0
 
 	## Old field which specifies the number of "chunks"
@@ -455,65 +424,104 @@ class Frame extends RefCounted:
 	## in this frame (if this is 0, use the old field)
 	var chunks_num_new: int = 0
 
+	## The chunks in this frame.
 	var chunks: Array[Chunk] = []
 
+	## The cels in this frame.
 	var cels: Array[Cel] = []
 
+	## Return the number of chunks in this frame.
 	func get_chunks_count() -> int:
 		# Per spec, use old chunks count if new chunks count is zero
 		return chunks_num_old if chunks_num_new == 0 else chunks_num_new
 
-	# func get_cels() -> Array[Cel]:
-	# 	return chunks.filter(func(c: Chunk): c is Cel)
+
+## Represent the chunk type.
+enum ChunkType {
+	## DEPRECATED
+	OLD_PALETTE_1 = 0x0004,
+
+	## DEPRECATED
+	OLD_PALETTE_2 = 0x0011,
+
+	## Layer chunk `0x2004`
+	LAYER = 0x2004,
+
+	## Cel chunk `0x2005`
+	CEL = 0x2005,
+
+	## Cel extra chunk `0x2006`
+	CEL_EXTRA = 0x2006,
+
+	## Color profile chunk `0x2007`
+	COLOR_PROFILE = 0x2007,
+
+	## External files chunk `0x2008`
+	EXTERNAL_FILES = 0x2008,
+
+	## DEPRECATED
+	MASK = 0x2016,
+
+	## Never used.
+	PATH = 0x2017,
+
+	## Tags chunk `0x2018`
+	TAGS = 0x2018,
+
+	## Palette chunk `0x2019`
+	PALETTE = 0x2019,
+
+	## User data chunk `0x2020`
+	USER_DATA = 0x2020,
+
+	## Slice chunk `0x2022`
+	SLICE = 0x2022,
+
+	## Tileset chunk `0x2023`
+	TILESET = 0x2023,
+}
 
 ## Base class for all chunks.
 class Chunk extends RefCounted:
-	enum ChunkType {
-		OLD_PALETTE_1 = 0x0004, # DEPRECATED
-		OLD_PALETTE_2 = 0x0011, # DEPRECATED
-		LAYER = 0x2004,
-		CEL = 0x2005,
-		CEL_EXTRA = 0x2006,
-		COLOR_PROFILE = 0x2007,
-		EXTERNAL_FILES = 0x2008,
-		MASK = 0x2016, # DEPRECATED
-		PATH = 0x2017,
-		TAGS = 0x2018,
-		PALETTE = 0x2019,
-		USER_DATA = 0x2020,
-		SLICE = 0x2022,
-		TILESET = 0x2023,
-	}
-
+	## Size of the chunk in bytes
 	var chunk_size: int = 0
 
 	## Chunk type
 	var chunk_type: ChunkType = 0
 
+
 ## 0x2019
 class Palette extends Chunk:
+	## Number of colors in the palette
 	var colors_count: int = 0
+
+	## First color index to change
 	var first_color: int = 0
+
+	## Last color index to change
 	var last_color: int = 0
 
 	## Palette colors
 	var colors: Array[PaletteColor] = []
 
+	## Return the first color in the palette, or null if the palette is empty.
 	func get_first_color() -> PaletteColor:
 		return self.colors[self.first_color] if self.colors.size() > self.first_color else null
 
+	## Return the last color in the palette, or null if the palette is empty.
 	func get_last_color() -> PaletteColor:
 		return self.colors[self.last_color] if self.colors.size() > self.last_color else null
 
-class PaletteColor extends RefCounted:
-	enum Flags {
-		## 1 = Has Name
-		HAS_NAME = 1 << 0
-	}
-
-	## Color flags
+## Palette color flags
+enum PaletteColorFlags {
 	## 1 = Has Name
-	var flags: int = 0
+	HAS_NAME = 1 << 0
+}
+
+## A single color in the palette.
+class PaletteColor extends RefCounted:
+	## Color flags
+	var flags: PaletteColorFlags = 0
 
 	## Red component (0-255)
 	var red: int = 0
@@ -530,61 +538,74 @@ class PaletteColor extends RefCounted:
 	## Color name (if flags & 1)
 	var name: String = ""
 
-	func has_name() -> bool:
-		return (self.flags & Flags.HAS_NAME) != 0
+	func has_name() -> bool: return (self.flags & PaletteColorFlags.HAS_NAME) != 0
 
 	## Convert to Godot Color
-	func to_color() -> Color:
-		return Color8(self.red, self.green, self.blue, self.alpha)
+	func to_color() -> Color: return Color8(self.red, self.green, self.blue, self.alpha)
+
+enum LayerType {
+	## Normal layer
+	NORMAL = 0,
+
+	## Group layer
+	GROUP = 1,
+
+	## Tilemap layer
+	TILEMAP = 2,
+}
+
+enum LayerFlags {
+	## The layer is visible
+	VISIBLE = 1 << 0,
+
+	## The layer is editable
+	EDITABLE = 1 << 1,
+
+	## The layer movement is locked
+	LOCK_MOVEMENT = 1 << 2,
+
+	## The layer is a background layer
+	BACKGROUND = 1 << 3,
+
+	## The layer prefers linked cels over linked frames
+	PREFER_LINKED_CELS = 1 << 4,
+
+	## The layer group should be displayed collapsed
+	GROUP_COLLAPSED = 1 << 5,
+
+	## The layer is a reference layer
+	REFERENCE_LAYER = 1 << 6,
+}
+
+enum LayerBlendMode {
+	NORMAL = 0,
+	MULTIPLY = 1,
+	SCREEN = 2,
+	OVERLAY = 3,
+	DARKEN = 4,
+	LIGHTEN = 5,
+	COLOR_DODGE = 6,
+	COLOR_BURN = 7,
+	HARD_LIGHT = 8,
+	SOFT_LIGHT = 9,
+	DIFFERENCE = 10,
+	EXCLUSION = 11,
+	HUE = 12,
+	SATURATION = 13,
+	COLOR = 14,
+	LUMINOSITY = 15,
+	ADDITION = 16,
+	SUBTRACT = 17,
+	DIVIDE = 18,
+}
 
 ## 0x2004
 class Layer extends Chunk:
-	enum Type {
-		NORMAL = 0,
-		GROUP = 1,
-		TILEMAP = 2,
-	}
-
-	enum Flags {
-		VISIBLE = 1 << 0,
-		EDITABLE = 1 << 1,
-		LOCK_MOVEMENT = 1 << 2,
-		BACKGROUND = 1 << 3,
-		## The layer prefers linked cels over linked frames
-		PREFER_LINKED_CELS = 1 << 4,
-		## The layer group should be displayed collapsed
-		GROUP_COLLAPSED = 1 << 5,
-		## The layer is a reference layer
-		REFERENCE_LAYER = 1 << 6,
-	}
-
-	enum BlendMode {
-		NORMAL = 0,
-		MULTIPLY = 1,
-		SCREEN = 2,
-		OVERLAY = 3,
-		DARKEN = 4,
-		LIGHTEN = 5,
-		COLOR_DODGE = 6,
-		COLOR_BURN = 7,
-		HARD_LIGHT = 8,
-		SOFT_LIGHT = 9,
-		DIFFERENCE = 10,
-		EXCLUSION = 11,
-		HUE = 12,
-		SATURATION = 13,
-		COLOR = 14,
-		LUMINOSITY = 15,
-		ADDITION = 16,
-		SUBTRACT = 17,
-		DIVIDE = 18,
-	}
-
 	## Layer flags
-	var flags: Flags
+	var flags: LayerFlags
 
 	## Layer type
-	var type: Type
+	var type: LayerType
 
 	## Layer child level
 	var child_level: int
@@ -596,7 +617,7 @@ class Layer extends Chunk:
 	var default_height: int
 
 	## Blend mode
-	var blend_mode: BlendMode
+	var blend_mode: LayerBlendMode
 
 	var opacity: int
 
@@ -606,27 +627,34 @@ class Layer extends Chunk:
 	var tileset_index: int = -1
 	var uuid: String = ""
 
-	func is_normal_layer() -> bool: return self.type == Layer.Type.NORMAL
-	func is_group_layer() -> bool: return self.type == Layer.Type.GROUP
-	func is_tilemap_layer() -> bool: return self.type == Layer.Type.TILEMAP
+	func is_normal_layer() -> bool: return self.type == LayerType.NORMAL
+	func is_group_layer() -> bool: return self.type == LayerType.GROUP
+	func is_tilemap_layer() -> bool: return self.type == LayerType.TILEMAP
 
-	func has_flag(flag: Flags) -> bool: return (self.flags & flag) != 0
+	func has_flag(flag: LayerFlags) -> bool: return (self.flags & flag) != 0
 
-	func is_visible() -> bool: return (self.flags & Layer.Flags.VISIBLE) != 0
+	func is_visible() -> bool: return (self.flags & LayerFlags.VISIBLE) != 0
 	func is_hidden() -> bool: return not self.is_visible()
-	func is_editable() -> bool: return (self.flags & Layer.Flags.EDITABLE) != 0
-	func is_background() -> bool: return (self.flags & Layer.Flags.BACKGROUND) != 0
-	func is_reference_layer() -> bool: return (self.flags & Layer.Flags.REFERENCE_LAYER) != 0
+	func is_editable() -> bool: return (self.flags & LayerFlags.EDITABLE) != 0
+	func is_background() -> bool: return (self.flags & LayerFlags.BACKGROUND) != 0
+	func is_reference_layer() -> bool: return (self.flags & LayerFlags.REFERENCE_LAYER) != 0
+
+enum CelType {
+	## Image cel
+	IMAGE = 0,
+
+	## Linked cel
+	LINKED_CEL = 1,
+
+	## Compressed cel
+	COMPRESSED_CEL = 2,
+
+	## Compressed tilemap
+	COMPRESSED_TILEMAP = 3,
+}
 
 ## 0x2005
 class Cel extends Chunk:
-	enum Type {
-		IMAGE = 0,
-		LINKED_CEL = 1,
-		COMPRESSED_CEL = 2,
-		COMPRESSED_TILEMAP = 3,
-	}
-
 	## Layer index
 	var layer_index: int
 
@@ -640,7 +668,7 @@ class Cel extends Chunk:
 	var opacity: int
 
 	## Cell type
-	var type: Cel.Type
+	var type: CelType
 
 	## Z index of the cell
 	var z_index: int
@@ -664,43 +692,47 @@ class Cel extends Chunk:
 
 	var extra: CelExtra = null
 
+## Cel extra flags
+enum CelExtraFlags {
+	## Precise bounds are set
+	PRECISE_BOUNDS = 1 << 0
+}
+
 ## 0x2006
 class CelExtra extends Chunk:
-	enum Flags {
-		## Precise bounds are set
-		PRECISE_BOUNDS = 1 << 0
-	}
-
-	var flags: int = 0
+	var flags: CelExtraFlags = 0
 	var precise_x: float = 0.0
 	var precise_y: float = 0.0
 	var width: float = 0.0
 	var height: float = 0.0
 
 	func has_precise_bounds() -> bool:
-		return (self.flags & Flags.PRECISE_BOUNDS) != 0
+		return (self.flags & CelExtraFlags.PRECISE_BOUNDS) != 0
+
+enum ColorProfileType {
+	## no color profile (as in old .aseprite files)
+	NO_PROFILE = 0,
+
+	## use sRGB
+	SRGB = 1,
+
+	## use the embedded ICC profile
+	EMBEDDED_ICC = 2,
+}
+
+## Color profile flags
+enum ColorProfileFlags {
+	## use special fixed gamma
+	USE_FIXED_GAMMA = 1
+}
 
 ## 0x2007
 class ColorProfile extends Chunk:
-	enum Type {
-		## no color profile (as in old .aseprite files)
-		NO_PROFILE = 0,
-		## use sRGB
-		SRGB = 1,
-		## use the embedded ICC profile
-		EMBEDDED_ICC = 2,
-	}
-
-	enum Flags {
-		## use special fixed gamma
-		USE_FIXED_GAMMA = 1
-	}
-
 	## Color profile type
-	var type: int = 0
+	var type: ColorProfileType = 0
 
 	## Flags
-	var flags: int = 0
+	var flags: ColorProfileFlags = 0
 
 	## Fixed gamma (1.0 = linear)
 	## Note: The gamma in sRGB is 2.2 in overall but it doesn't use
@@ -713,7 +745,8 @@ class ColorProfile extends Chunk:
 	var icc_data: PackedByteArray = []
 
 	func has_fixed_gamma() -> bool:
-		return (self.flags & Flags.USE_FIXED_GAMMA) != 0
+		return (self.flags & ColorProfileFlags.USE_FIXED_GAMMA) != 0
+
 
 ## 0x2008
 class ExternalFiles extends Chunk:
@@ -721,26 +754,29 @@ class ExternalFiles extends Chunk:
 
 	var files: Array[ExternalFile] = []
 
-class ExternalFile extends RefCounted:
-	enum Type {
-		## External palette
-		EXTERNAL_PALETTE = 0,
-		## External tileset
-		EXTERNAL_TILESET = 1,
-		## Extension name for properties
-		EXTENSION_PROPERTIES = 2,
-		## Extension name for tile management (can exist one per sprite)
-		EXTENSION_TILE_MANAGEMENT = 3,
-	}
+## Type of external file.
+enum ExternalFileType {
+	## External palette
+	EXTERNAL_PALETTE = 0,
+	## External tileset
+	EXTERNAL_TILESET = 1,
+	## Extension name for properties
+	EXTENSION_PROPERTIES = 2,
+	## Extension name for tile management (can exist one per sprite)
+	EXTENSION_TILE_MANAGEMENT = 3,
+}
 
+## A single external file entry.
+class ExternalFile extends RefCounted:
 	## Entry ID (this ID is referenced by tilesets, palettes, or extended properties)
 	var id: int = 0
 
 	## Type
-	var type: ExternalFile.Type
+	var type: ExternalFileType
 
 	## External file name or extension ID (see NOTE.4)
 	var filename: String = ""
+
 
 ## 0x2018
 class Tags extends Chunk:
@@ -748,17 +784,18 @@ class Tags extends Chunk:
 
 	var tags: Array[Tag] = []
 
-class Tag extends RefCounted:
-	enum LoopDirection {
-		FORWARD = 0,
-		REVERSE = 1,
-		PING_PONG = 2,
-		PING_PONG_REVERSE = 3,
-	}
+enum TagLoopDirection {
+	FORWARD = 0,
+	REVERSE = 1,
+	PING_PONG = 2,
+	PING_PONG_REVERSE = 3,
+}
 
+## A tag entry.
+class Tag extends RefCounted:
 	var from_frame: int = 0
 	var to_frame: int = 0
-	var loop_direction: LoopDirection
+	var loop_direction: TagLoopDirection
 	var repeat: int = 0
 
 	## @deprecated
@@ -770,21 +807,58 @@ class Tag extends RefCounted:
 
 	var name: String = ""
 
-## 0x2022
-class Slice extends Chunk:
+
+# 0x2020
+class UserData extends Chunk:
 	enum Flags {
-		## It's a 9-patches slice
-		NINE_PATCHES = 1 << 0,
-		## Has pivot information
-		HAS_PIVOT = 1 << 1,
+		## Has text data
+		HAS_TEXT = 1 << 0,
+		## Has color data
+		HAS_COLOR = 1 << 1,
+		## Has properties data
+		HAS_PROPERTIES = 1 << 2,
 	}
 
+	var flags: UserData.Flags = 0
+
+	var text: String = ""
+
+	var color_r: int = 0
+	var color_g: int = 0
+	var color_b: int = 0
+	var color_a: int = 0
+
+	var properties_size: int = 0
+	var properties_maps_count: int = 0
+
+	var maps: Array[PropertyMap] = []
+
+class PropertyMap extends RefCounted:
+	var key: int = 0
+	var properties_count: int = 0
+
+	var properties: Array[UserDataProperty] = []
+
+class UserDataProperty extends RefCounted:
+	var name: String = ""
+	var type: int = 0
+
+enum SliceFlags {
+	## It's a 9-patches slice
+	NINE_PATCHES = 1 << 0,
+	## Has pivot information
+	HAS_PIVOT = 1 << 1,
+}
+
+## 0x2022
+class Slice extends Chunk:
 	var keys_count: int = 0
-	var flags: Flags = 0
+	var flags: SliceFlags = 0
 	var name: String = ""
 
 	var keys: Array[SliceKey] = []
 
+## A slice key.
 class SliceKey extends RefCounted:
 	var frame_number: int = 0
 	var x: int = 0
@@ -800,35 +874,35 @@ class SliceKey extends RefCounted:
 	var pivot_x: int = 0
 	var pivot_y: int = 0
 
+enum TilesetFlags {
+	## Include link to external file
+	INCLUDE_LINK_TO_EXTERNAL_FILE = 1 << 0,
+
+	## Include tiles inside this file
+	INCLUDE_TILES_INSIDE_FILE = 1 << 1,
+
+	## Tilemaps using this tileset use tile ID=0 as empty tile
+	## (this is the new format). In rare cases this bit is off,
+	## and the empty tile will be equal to 0xffffffff (used in
+	## internal versions of Aseprite)
+	TILEMAPS_USE_ID0_AS_EMPTY_TILE = 1 << 2,
+
+	## Aseprite will try to match modified tiles with their X
+	## flipped version automatically in Auto mode when using
+	## this tileset.
+	AUTO_X_FLIP = 1 << 3,
+
+	## Same for Y flips
+	AUTO_Y_FLIP = 1 << 4,
+
+	## Same for D(iagonal) flips
+	AUTO_DIAGONAL_FLIP = 1 << 5,
+}
+
 ## 0x2023
 class Tileset extends Chunk:
-	enum Flags {
-		## Include link to external file
-		INCLUDE_LINK_TO_EXTERNAL_FILE = 1 << 0,
-
-		## Include tiles inside this file
-		INCLUDE_TILES_INSIDE_FILE = 1 << 1,
-
-		## Tilemaps using this tileset use tile ID=0 as empty tile
-		## (this is the new format). In rare cases this bit is off,
-		## and the empty tile will be equal to 0xffffffff (used in
-		## internal versions of Aseprite)
-		TILEMAPS_USE_ID0_AS_EMPTY_TILE = 1 << 2,
-
-		## Aseprite will try to match modified tiles with their X
-		## flipped version automatically in Auto mode when using
-		## this tileset.
-		AUTO_X_FLIP = 1 << 3,
-
-		## Same for Y flips
-		AUTO_Y_FLIP = 1 << 4,
-
-		## Same for D(iagonal) flips
-		AUTO_DIAGONAL_FLIP = 1 << 5,
-	}
-
 	var id: int = 0
-	var flags: Flags = 0
+	var flags: TilesetFlags = 0
 	var tiles_count: int = 0
 	var tile_width: int = 0
 	var tile_height: int = 0
@@ -838,16 +912,27 @@ class Tileset extends Chunk:
 	var external_id: int = -1
 	var buffer: PackedByteArray = []
 
+
+## 0x0004, 0x0011, 0x2016, 0x2017
 class UnsupportedChunk extends Chunk:
 	pass
 
-# FileAccess does not extend StreamPeer...
+
+# #FileAccess does not extend StreamPeer...
 # Additionally, get_xxx() do not return an error if the stream is empty
 # we are supposed to check get_available_bytes() first
 # however i am unsure if get_available_bytes() == 0 means we cant read no more
+
+## Reader for Aseprite files.
+## Supports reading from a file path, FileAccess, StreamPeer or PackedByteArray.
 class AsepriteReader extends RefCounted:
 	enum ReadFlags {
+		NONE = 0,
+
+		## Do not read binary data.
 		SKIP_BUFFER = 1 << 0,
+
+		## Automatically decompress gzipped data.
 		DECOMPRESS = 1 << 1,
 	}
 
@@ -1066,14 +1151,14 @@ class AsepriteReader extends RefCounted:
 		return hex
 
 	## Read a buffer, optionally decompressing it.
-	func read_buffer(length: int, flags: ReadFlags = 0, decompress_size: int = 0) -> PackedByteArray:
-		if flags & ReadFlags.SKIP_BUFFER != 0:
+	func read_buffer(length: int, decompress_size: int = 0) -> PackedByteArray:
+		if _flags & ReadFlags.SKIP_BUFFER != 0:
 			skip(length)
 			return []
 
 		var buf := get_buffer(length)
 
-		if flags & ReadFlags.DECOMPRESS != 0 and decompress_size > 0:
+		if _flags & ReadFlags.DECOMPRESS != 0 and decompress_size > 0:
 			buf = buf.decompress(decompress_size, FileAccess.CompressionMode.COMPRESSION_DEFLATE)
 
 		return buf
@@ -1183,11 +1268,11 @@ class AsepriteReader extends RefCounted:
 	#   DWORD     Tileset index
 	# + If file header flags have bit 4:
 	#   UUID      Layer's universally unique identifier
-	func read_layer_chunk(header: ChunkHeader) -> AsepriteFile.Layer:
+	func read_layer_chunk(chunk_header: ChunkHeader) -> AsepriteFile.Layer:
 		var layer := AsepriteFile.Layer.new()
 
-		layer.chunk_size = header.size if header else 0
-		layer.chunk_type = header.type if header else 0
+		layer.chunk_size = chunk_header.size if chunk_header else 0
+		layer.chunk_type = chunk_header.type if chunk_header else 0
 
 		layer.flags = get_word()
 		layer.type = get_word()
@@ -1235,11 +1320,11 @@ class AsepriteReader extends RefCounted:
 	#   DWORD     Bitmask for diagonal flip (swap X/Y axis)
 	#   BYTE[10]  Reserved
 	#   TILE[]    Row by row, from top to bottom tile by tile compressed with ZLIB method (see NOTE.3)
-	func read_cel_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> AsepriteFile.Cel:
+	func read_cel_chunk(chunk_header: ChunkHeader, color_depth: int) -> AsepriteFile.Cel:
 		var cel := AsepriteFile.Cel.new()
 
-		cel.chunk_size = header.size if header else 0
-		cel.chunk_type = header.type if header else 0
+		cel.chunk_size = chunk_header.size if chunk_header else 0
+		cel.chunk_type = chunk_header.type if chunk_header else 0
 
 		cel.layer_index = get_word()
 		cel.x = get_short()
@@ -1252,8 +1337,8 @@ class AsepriteReader extends RefCounted:
 		if cel.type == 0:
 			cel.w = get_word()
 			cel.h = get_word()
-			# cel of type 0 are never compressed (flags & ~ReadFlags.DECOMPRESS)
-			cel.buffer = read_buffer(cel.chunk_size - 26, flags, 0)
+			# cel of type 0 are never compressed
+			cel.buffer = read_buffer(cel.chunk_size - 26, 0)
 
 		elif cel.type == 1:
 			cel.link = get_word()
@@ -1261,7 +1346,7 @@ class AsepriteReader extends RefCounted:
 		elif cel.type == 2:
 			cel.w = get_word()
 			cel.h = get_word()
-			cel.buffer = read_buffer(cel.chunk_size - 26, flags, cel.w * cel.h * (color_depth / 8))
+			cel.buffer = read_buffer(cel.chunk_size - 26, cel.w * cel.h * (color_depth / 8))
 
 		elif cel.type == 3:
 			cel.w = get_word()
@@ -1272,7 +1357,7 @@ class AsepriteReader extends RefCounted:
 			cel.bitmask_for_y_flip = get_dword()
 			cel.bitmask_for_90cw_rotation = get_dword()
 			skip(10)
-			cel.buffer = read_buffer(cel.chunk_size - 54, flags, cel.w * cel.h * (cel.bits_per_tile / 8))
+			cel.buffer = read_buffer(cel.chunk_size - 54, cel.w * cel.h * (cel.bits_per_tile / 8))
 
 		return cel
 
@@ -1283,11 +1368,11 @@ class AsepriteReader extends RefCounted:
 	#     FIXED       Width of the cel in the sprite (scaled in real-time)
 	#     FIXED       Height of the cel in the sprite
 	#     BYTE[16]    For future use (set to zero)
-	func read_cel_extra_chunk(header: ChunkHeader) -> AsepriteFile.CelExtra:
+	func read_cel_extra_chunk(chunk_header: ChunkHeader) -> AsepriteFile.CelExtra:
 		var cel_extra := AsepriteFile.CelExtra.new()
 
-		cel_extra.chunk_size = header.size if header else 0
-		cel_extra.chunk_type = header.type if header else 0
+		cel_extra.chunk_size = chunk_header.size if chunk_header else 0
+		cel_extra.chunk_type = chunk_header.type if chunk_header else 0
 
 		cel_extra.flags = get_word()
 		cel_extra.precise_x = get_fixed()
@@ -1306,11 +1391,11 @@ class AsepriteReader extends RefCounted:
 	# + If type = ICC:
 	#   DWORD     ICC profile data length
 	#   BYTE[]    ICC profile data. More info: http://www.color.org/ICC1V42.pdf
-	func read_color_profile_chunk(header: ChunkHeader, flags: ReadFlags = 0) -> AsepriteFile.ColorProfile:
+	func read_color_profile_chunk(chunk_header: ChunkHeader) -> AsepriteFile.ColorProfile:
 		var color_profile := AsepriteFile.ColorProfile.new()
 
-		color_profile.chunk_size = header.size if header else 0
-		color_profile.chunk_type = header.type if header else 0
+		color_profile.chunk_size = chunk_header.size if chunk_header else 0
+		color_profile.chunk_type = chunk_header.type if chunk_header else 0
 
 		color_profile.type = get_word()
 		color_profile.flags = get_word()
@@ -1319,7 +1404,7 @@ class AsepriteReader extends RefCounted:
 
 		if color_profile.type == 2:
 			var icc_data_len := get_dword()
-			color_profile.icc_data = read_buffer(icc_data_len, flags, 0)
+			color_profile.icc_data = read_buffer(icc_data_len, 0)
 
 		return color_profile
 
@@ -1331,11 +1416,11 @@ class AsepriteReader extends RefCounted:
 	#   BYTE      Type
 	#   BYTE[7]   Reserved (set to zero)
 	#   STRING    External file name or extension ID (see NOTE.4)
-	func read_external_files_chunk(header: ChunkHeader) -> AsepriteFile.ExternalFiles:
+	func read_external_files_chunk(chunk_header: ChunkHeader) -> AsepriteFile.ExternalFiles:
 		var external_files := AsepriteFile.ExternalFiles.new()
 
-		external_files.chunk_size = header.size if header else 0
-		external_files.chunk_type = header.type if header else 0
+		external_files.chunk_size = chunk_header.size if chunk_header else 0
+		external_files.chunk_type = chunk_header.type if chunk_header else 0
 
 		external_files.files_count = get_dword()
 		skip(8)
@@ -1364,11 +1449,11 @@ class AsepriteReader extends RefCounted:
 	#   BYTE[3]   RGB values of the tag color
 	#   BYTE      Extra byte (zero)
 	#   STRING    Tag name
-	func read_tags_chunk(header: ChunkHeader) -> AsepriteFile.Tags:
+	func read_tags_chunk(chunk_header: ChunkHeader) -> AsepriteFile.Tags:
 		var tags := AsepriteFile.Tags.new()
 
-		tags.chunk_size = header.size if header else 0
-		tags.chunk_type = header.type if header else 0
+		tags.chunk_size = chunk_header.size if chunk_header else 0
+		tags.chunk_type = chunk_header.type if chunk_header else 0
 
 		tags.tags_count = get_word()
 		skip(8)
@@ -1404,11 +1489,11 @@ class AsepriteReader extends RefCounted:
 	#   BYTE      Alpha (0-255)
 	#   + If has name bit in entry flags
 	#     STRING  Color name
-	func read_palette_chunk(header: ChunkHeader) -> AsepriteFile.Palette:
+	func read_palette_chunk(chunk_header: ChunkHeader) -> AsepriteFile.Palette:
 		var palette := AsepriteFile.Palette.new()
 
-		palette.chunk_size = header.size if header else 0
-		palette.chunk_type = header.type if header else 0
+		palette.chunk_size = chunk_header.size if chunk_header else 0
+		palette.chunk_type = chunk_header.type if chunk_header else 0
 
 		palette.colors_count = get_dword()
 		palette.first_color = get_dword()
@@ -1424,12 +1509,147 @@ class AsepriteReader extends RefCounted:
 			color.blue = get_byte()
 			color.alpha = get_byte()
 
-			if color.flags & AsepriteFile.PaletteColor.Flags.HAS_NAME != 0:
+			if color.flags & PaletteColorFlags.HAS_NAME != 0:
 				color.name = get_string()
 
 			palette.colors.append(color)
 
 		return palette
+
+	# 0x2020
+	# Specifies the user data (color/text/properties) to be associated with
+	# the last read chunk/object. E.g. If the last chunk we've read is a
+	# layer and then this chunk appears, this user data belongs to that
+	# layer, if we've read a cel, it belongs to that cel, etc. There are
+	# some special cases:
+
+	# 1. After a Tags chunk, there will be several user data chunks, one for
+	#    each tag, you should associate the user data in the same order as
+	#    the tags are in the Tags chunk.
+	# 2. After the Tileset chunk, it could be followed by a user data chunk
+	#    (empty or not) and then all the user data chunks of the tiles
+	#    ordered by tile index, or it could be followed by none user data
+	#    chunk (if the file was created in an older Aseprite version of if
+	#    no tile has user data).
+	# 3. In Aseprite v1.3 a sprite has associated user data, to consider
+	#    this case there is an User Data Chunk at the first frame after the
+	#    Palette Chunk.
+
+	# The data of this chunk is as follows:
+
+	#     DWORD       Flags
+	#                   1 = Has text
+	#                   2 = Has color
+	#                   4 = Has properties
+	#     + If flags have bit 1
+	#       STRING    Text
+	#     + If flags have bit 2
+	#       BYTE      Color Red (0-255)
+	#       BYTE      Color Green (0-255)
+	#       BYTE      Color Blue (0-255)
+	#       BYTE      Color Alpha (0-255)
+	#     + If flags have bit 4
+	#       DWORD     Size in bytes of all properties maps stored in this chunk
+	#                 The size includes the this field and the number of property maps
+	#                 (so it will be a value greater or equal to 8 bytes).
+	#       DWORD     Number of properties maps
+	#       + For each properties map:
+	#         DWORD     Properties maps key
+	#                   == 0 means user properties
+	#                   != 0 means an extension Entry ID (see External Files Chunk))
+	#         DWORD     Number of properties
+	#         + For each property:
+	#           STRING    Name
+	#           WORD      Type
+	#           + If type==0x0001 (bool)
+	#             BYTE    == 0 means FALSE
+	#                     != 0 means TRUE
+	#           + If type==0x0002 (int8)
+	#             BYTE
+	#           + If type==0x0003 (uint8)
+	#             BYTE
+	#           + If type==0x0004 (int16)
+	#             SHORT
+	#           + If type==0x0005 (uint16)
+	#             WORD
+	#           + If type==0x0006 (int32)
+	#             LONG
+	#           + If type==0x0007 (uint32)
+	#             DWORD
+	#           + If type==0x0008 (int64)
+	#             LONG64
+	#           + If type==0x0009 (uint64)
+	#             QWORD
+	#           + If type==0x000A
+	#             FIXED
+	#           + If type==0x000B
+	#             FLOAT
+	#           + If type==0x000C
+	#             DOUBLE
+	#           + If type==0x000D
+	#             STRING
+	#           + If type==0x000E
+	#             POINT
+	#           + If type==0x000F
+	#             SIZE
+	#           + If type==0x0010
+	#             RECT
+	#           + If type==0x0011 (vector)
+	#             DWORD     Number of elements
+	#             WORD      Element's type.
+	#             + If Element's type == 0 (all elements are not of the same type)
+	#               For each element:
+	#                 WORD      Element's type
+	#                 BYTE[]    Element's value. Structure depends on the
+	#                           element's type
+	#             + Else (all elements are of the same type)
+	#               For each element:
+	#                 BYTE[]    Element's value. Structure depends on the
+	#                           element's type
+	#           + If type==0x0012 (nested properties map)
+	#             DWORD     Number of properties
+	#             BYTE[]    Nested properties data
+	#                       Structure is the same as indicated in this loop
+	#           + If type==0x0013
+	#             UUID
+	func _read_user_data_chunk(chunk_header: ChunkHeader) -> AsepriteFile.UserData:
+		var user_data := AsepriteFile.UserData.new()
+
+		user_data.chunk_size = chunk_header.size if chunk_header else 0
+		user_data.chunk_type = chunk_header.type if chunk_header else 0
+
+		user_data.flags = get_dword()
+
+		if user_data.flags & 1 != 0:
+			user_data.text = get_string()
+
+		if user_data.flags & 2 != 0:
+			user_data.color_r = get_byte()
+			user_data.color_g = get_byte()
+			user_data.color_b = get_byte()
+			user_data.color_a = get_byte()
+
+		if user_data.flags & 4 != 0:
+			user_data.properties_size = get_dword()
+			user_data.properties_maps_count = get_dword()
+
+			for __ in range(user_data.properties_maps_count):
+				var properties_map := AsepriteFile.PropertyMap.new()
+
+				user_data.maps.append(properties_map)
+
+				properties_map.key = get_dword()
+				properties_map.properties_count = get_dword()
+
+				for ___ in range(properties_map.properties_count):
+					var property := AsepriteFile.UserDataProperty.new()
+
+					properties_map.properties.append(property)
+
+					property.name = get_string()
+					property.type = get_word()
+
+		return user_data
 
 	# 0x2022
 	# DWORD       Number of "slice keys"
@@ -1450,11 +1670,11 @@ class AsepriteReader extends RefCounted:
 	#   + If flags have bit 2
 	#     LONG    Pivot X position (relative to the slice origin)
 	#     LONG    Pivot Y position (relative to the slice origin)
-	func read_slice_chunk(header: ChunkHeader) -> AsepriteFile.Slice:
+	func read_slice_chunk(chunk_header: ChunkHeader) -> AsepriteFile.Slice:
 		var slice := AsepriteFile.Slice.new()
 
-		slice.chunk_size = header.size if header else 0
-		slice.chunk_type = header.type if header else 0
+		slice.chunk_size = chunk_header.size if chunk_header else 0
+		slice.chunk_type = chunk_header.type if chunk_header else 0
 
 		slice.keys_count = get_dword()
 		slice.flags = get_dword()
@@ -1470,13 +1690,13 @@ class AsepriteReader extends RefCounted:
 			key.width = get_dword()
 			key.height = get_dword()
 
-			if slice.flags & AsepriteFile.Slice.Flags.NINE_PATCHES != 0:
+			if slice.flags & SliceFlags.NINE_PATCHES != 0:
 				key.center_x = get_long()
 				key.center_y = get_long()
 				key.center_width = get_dword()
 				key.center_height = get_dword()
 
-			if slice.flags & AsepriteFile.Slice.Flags.HAS_PIVOT != 0:
+			if slice.flags & SliceFlags.HAS_PIVOT != 0:
 				key.pivot_x = get_long()
 				key.pivot_y = get_long()
 
@@ -1499,11 +1719,11 @@ class AsepriteReader extends RefCounted:
 	# + If flag 2 is set
 	#   DWORD     Data length of the compressed Tileset image
 	#   PIXEL[]   Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
-	func read_tileset_chunk(header: ChunkHeader, color_depth: int, flags: ReadFlags = 0) -> AsepriteFile.Tileset:
+	func read_tileset_chunk(chunk_header: ChunkHeader, color_depth: int) -> AsepriteFile.Tileset:
 		var tileset := AsepriteFile.Tileset.new()
 
-		tileset.chunk_size = header.size if header else 0
-		tileset.chunk_type = header.type if header else 0
+		tileset.chunk_size = chunk_header.size if chunk_header else 0
+		tileset.chunk_type = chunk_header.type if chunk_header else 0
 
 		tileset.id = get_dword()
 		tileset.flags = get_dword()
@@ -1520,37 +1740,37 @@ class AsepriteReader extends RefCounted:
 
 		if tileset.flags & 2 != 0:
 			var data_len := get_dword()
-			tileset.buffer = read_buffer(data_len, flags, tileset.tile_width * tileset.tile_height * (color_depth / 8) * tileset.tiles_count)
+			tileset.buffer = read_buffer(data_len, tileset.tile_width * tileset.tile_height * (color_depth / 8) * tileset.tiles_count)
 
 		return tileset
 
-	func read_empty_chunk(header: ChunkHeader) -> AsepriteFile.UnsupportedChunk:
+	func read_empty_chunk(chunk_header: ChunkHeader) -> AsepriteFile.UnsupportedChunk:
 		var chunk := AsepriteFile.UnsupportedChunk.new()
 
-		chunk.chunk_size = header.size if header else 0
-		chunk.chunk_type = header.type if header else 0
+		chunk.chunk_size = chunk_header.size if chunk_header else 0
+		chunk.chunk_type = chunk_header.type if chunk_header else 0
 
 		skip(chunk.chunk_size - 6)
 
 		return chunk
 
-	func read_chunk(header: AsepriteFile, flags: ReadFlags = 0) -> AsepriteFile.Chunk:
+	func read_chunk(header: AsepriteFile) -> AsepriteFile.Chunk:
 		var chunk_header := read_chunk_header()
 		var color_depth := header.color_depth
 
 		match chunk_header.type:
-			AsepriteFile.Chunk.ChunkType.LAYER: return read_layer_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.CEL: return read_cel_chunk(chunk_header, color_depth, flags)
-			AsepriteFile.Chunk.ChunkType.CEL_EXTRA: return read_cel_extra_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.COLOR_PROFILE: return read_color_profile_chunk(chunk_header, flags)
-			AsepriteFile.Chunk.ChunkType.EXTERNAL_FILES: return read_external_files_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.TAGS: return read_tags_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.PALETTE: return read_palette_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.SLICE: return read_slice_chunk(chunk_header)
-			AsepriteFile.Chunk.ChunkType.TILESET: return read_tileset_chunk(chunk_header, color_depth, flags)
+			ChunkType.LAYER: return read_layer_chunk(chunk_header)
+			ChunkType.CEL: return read_cel_chunk(chunk_header, color_depth)
+			ChunkType.CEL_EXTRA: return read_cel_extra_chunk(chunk_header)
+			ChunkType.COLOR_PROFILE: return read_color_profile_chunk(chunk_header)
+			ChunkType.EXTERNAL_FILES: return read_external_files_chunk(chunk_header)
+			ChunkType.TAGS: return read_tags_chunk(chunk_header)
+			ChunkType.PALETTE: return read_palette_chunk(chunk_header)
+			ChunkType.SLICE: return read_slice_chunk(chunk_header)
+			ChunkType.TILESET: return read_tileset_chunk(chunk_header, color_depth)
 			_: return read_empty_chunk(chunk_header)
 
-	func read_ase(flags: ReadFlags = 0) -> AsepriteFile:
+	func read_ase() -> AsepriteFile:
 		var ase := read_header()
 
 		if ase.magic_number != AsepriteFile.MAGIC_NUMBER:
@@ -1565,7 +1785,7 @@ class AsepriteReader extends RefCounted:
 			ase.frames.append(frame)
 
 			for ___ in range(frame.get_chunks_count()):
-				frame.chunks.append(read_chunk(ase, flags))
+				frame.chunks.append(read_chunk(ase))
 
 		for frame in ase.frames:
 			for chunk in frame.chunks:
@@ -1589,6 +1809,7 @@ class AsepriteReader extends RefCounted:
 			frame.cels.make_read_only()
 
 		return ase
+
 
 	## Represent a chunk header
 	## DWORD       Chunk size
