@@ -453,45 +453,51 @@ class Frame extends RefCounted:
 ## Represent the chunk type.
 enum ChunkType {
 	## DEPRECATED
+	##
+	## @deprecated
 	OLD_PALETTE_1 = 0x0004,
 
 	## DEPRECATED
+	##
+	## @deprecated
 	OLD_PALETTE_2 = 0x0011,
 
-	## Layer chunk `0x2004`
+	## Layer chunk [code]0x2004[/code]
 	LAYER = 0x2004,
 
-	## Cel chunk `0x2005`
+	## Cel chunk [code]0x2005[/code]
 	CEL = 0x2005,
 
-	## Cel extra chunk `0x2006`
+	## Cel extra chunk [code]0x2006[/code]
 	CEL_EXTRA = 0x2006,
 
-	## Color profile chunk `0x2007`
+	## Color profile chunk [code]0x2007[/code]
 	COLOR_PROFILE = 0x2007,
 
-	## External files chunk `0x2008`
+	## External files chunk [code]0x2008[/code]
 	EXTERNAL_FILES = 0x2008,
 
 	## DEPRECATED
+	##
+	## @deprecated
 	MASK = 0x2016,
 
 	## Never used.
 	PATH = 0x2017,
 
-	## Tags chunk `0x2018`
+	## Tags chunk [code]0x2018[/code]
 	TAGS = 0x2018,
 
-	## Palette chunk `0x2019`
+	## Palette chunk [code]0x2019[/code]
 	PALETTE = 0x2019,
 
-	## User data chunk `0x2020`
+	## User data chunk [code]0x2020[/code]
 	USER_DATA = 0x2020,
 
-	## Slice chunk `0x2022`
+	## Slice chunk [code]0x2022[/code]
 	SLICE = 0x2022,
 
-	## Tileset chunk `0x2023`
+	## Tileset chunk [code]0x2023[/code]
 	TILESET = 0x2023,
 }
 
@@ -812,10 +818,18 @@ class Tag extends RefCounted:
 	var loop_direction: TagLoopDirection
 	var repeat: int = 0
 
+	## Deprecated, used only for backward compatibility with Aseprite v1.2.x
+	## The color of the tag is the one in the user data field following the tags chunk
 	## @deprecated
 	var color_r: int = 0
+
+	## Deprecated, used only for backward compatibility with Aseprite v1.2.x
+	## The color of the tag is the one in the user data field following the tags chunk
 	## @deprecated
 	var color_g: int = 0
+
+	## Deprecated, used only for backward compatibility with Aseprite v1.2.x
+	## The color of the tag is the one in the user data field following the tags chunk
 	## @deprecated
 	var color_b: int = 0
 
