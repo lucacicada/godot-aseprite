@@ -1,4 +1,17 @@
 ## This class is used to read Aseprite files and extract metadata such as frames and layers.
+##
+## Open and read a file:
+## [codeblock]
+## var ase := AsepriteFile.open("res://path/to/file.aseprite")
+## [/codeblock]
+##
+## Open return [code]null[/code] if the file could not be opened, you can use [method get_open_error] to get the error code.
+## [codeblock]
+## var ase := AsepriteFile.open("res://path/to/file.aseprite")
+## if ase == null:
+##     var err := AsepriteFile.get_open_error()
+##     print("Failed to open Aseprite file: %s" % error_string(err))
+## [/codeblock]
 class_name AsepriteFile extends RefCounted
 
 const CHUNK_OLD_PALETTE_1 := ChunkType.OLD_PALETTE_1
@@ -81,10 +94,10 @@ var width: int = 0
 ## Height in pixels
 var height: int = 0
 
-## Color depth (bits per pixel)
-## 32 bpp = RGBA
-## 16 bpp = Grayscale
-## 8 bpp = Indexed
+## Color depth:
+## [br] • [code]32[/code] = RGBA, 8 bits per channel
+## [br] • [code]16[/code] = Grayscale, 8 bits for luminance, 8 bits for alpha
+## [br] • [code]8 [/code]= Indexed, 8 bits per pixel (palette index)
 var color_depth: int = 0
 
 ## Flags (see NOTE.6):
@@ -94,8 +107,10 @@ var color_depth: int = 0
 var flags: int = 0
 
 ## Speed (milliseconds between frame, like in FLC files)
-## DEPRECATED: You should use the frame duration field
+## [br]
+## [b]DEPRECATED[/b]: You should use the frame duration field
 ## from each frame header
+## @deprecated
 var speed: int = 0
 
 ## Palette entry (index) which represent transparent color
@@ -375,8 +390,7 @@ static var _last_open_error: Error = OK
 static func get_open_error() -> Error:
 	return _last_open_error
 
-## Opens the Aseprite file for reading.
-## Once a file is opened, it cannot be opened again, you need to create a new instance of this class.
+## Open and read an Aseprite file from the specified path.
 static func open(path: String, flags: AsepriteReader.ReadFlags = AsepriteReader.ReadFlags.DECOMPRESS) -> AsepriteFile:
 	var reader := AsepriteReader.new()
 	_last_open_error = reader.open(path, flags)
@@ -924,7 +938,35 @@ class UnsupportedChunk extends Chunk:
 # however i am unsure if get_available_bytes() == 0 means we cant read no more
 
 ## Reader for Aseprite files.
+##
 ## Supports reading from a file path, FileAccess, StreamPeer or PackedByteArray.
+## [br]
+## [br]
+## To read from a file path, you can use:
+## [codeblock]
+## var reader := AsepriteReader.new()
+##
+## # Open for read, skip buffer data
+## var err := reader.open("res://path/to/file.aseprite", AsepriteReader.ReadFlags.SKIP_BUFFER)
+##
+## # Read the header
+## var header := reader.read_header()
+##
+## # For each frame, read the frame data
+## for frame_index in range(header.num_frames):
+##     # Read the frame
+##     var frame := reader.read_frame()
+##
+##     # Now we can read each chunk in the frame
+##     for chunk_index in range(frame.get_chunks_count()):
+##         # Read the chunk header
+##         var chunk_header := read_chunk_header()
+##
+##         # Do something with the chunk type
+##         match chunk_header.chunk_type:
+##            # Remember to read the chunk data, if you do not need it, read as empty chunk
+##             _: read_empty_chunk()
+## [/codeblock]
 class AsepriteReader extends RefCounted:
 	enum ReadFlags {
 		NONE = 0,
