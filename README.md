@@ -11,6 +11,10 @@ if ase == null:
     return
 ```
 
+The script is in a single GDScript file [addons/aseprite_file/aseprite_file.gd](addons/aseprite_file/aseprite_file.gd)
+
+You can use it as a plugin or copy the file in your project.
+
 ## Supported Chunks
 - [x] Layer Chunk [0x2004]
 - [x] Cel Chunk [0x2005]
@@ -41,12 +45,6 @@ Deprecated chunks are present in the spec but unused by Aseprite.
 - [ ] Mask Chunk (0x2016) DEPRECATED
 - [ ] Path Chunk (0x2017) Never used
 
-## Script
-
-The script is in a single GDScript file [addons/aseprite_file/aseprite_file.gd](addons/aseprite_file/aseprite_file.gd)
-
-You can use it as a plugin or copy the file in your project.
-
 ## Security note
 
 Be careful using this parser for untrusted files, especially if you plan to use it for network shared resources.
@@ -63,3 +61,9 @@ Transparent pixels can be compressed efficiently, the raw data is `w * h * color
 ~~A heuristic could be implemented to limit this class of attacks, `compressed_size * 5.7` is a good estimate, exceeding an order of magnitude is likely a malformed file. A compression rate of `10:1` is extreme for images.~~
 
 Edit: This parser is **NOT** vulnerable to gzip bombs, it turns out I already contradicted myself in the code, the `decompress_dynamic` call has been replaced with `decompress` with the appropriate expected size.
+
+## Aseprite file format specification
+
+The Aseprite file format specification is available here:
+
+https://github.com/aseprite/aseprite/blob/main/docs/ase-file-specs.md
