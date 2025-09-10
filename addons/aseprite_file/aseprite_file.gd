@@ -1850,7 +1850,7 @@ class AsepriteReader extends RefCounted:
 				elif chunk is AsepriteFile.CelExtra: frame.cels[frame.cels.size() - 1].extra = chunk
 				elif chunk is AsepriteFile.ExternalFiles: ase.external_files = chunk.files
 				elif chunk is AsepriteFile.ColorProfile: ase.color_profile = chunk
-				elif chunk is AsepriteFile.Tags: ase.tags.append(chunk)
+				elif chunk is AsepriteFile.Tags: for tag in chunk.tags: ase.tags.append(tag)
 				elif chunk is AsepriteFile.Palette: ase.palette = chunk
 				elif chunk is AsepriteFile.Tileset: ase.tilesets.append(chunk)
 
