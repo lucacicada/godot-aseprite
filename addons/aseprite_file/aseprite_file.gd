@@ -997,6 +997,8 @@ class AsepriteReader extends RefCounted:
 
 	## Open a file or stream for reading.
 	func open(data: Variant, flags: ReadFlags = ReadFlags.DECOMPRESS) -> Error:
+		_flags = flags
+
 		if data is FileAccess:
 			data.big_endian = false
 			_stream = data
