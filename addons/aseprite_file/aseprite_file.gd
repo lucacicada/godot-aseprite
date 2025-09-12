@@ -391,6 +391,7 @@ static func get_open_error() -> Error:
 	return _last_open_error
 
 ## Open and read an Aseprite file from the specified path.
+## It returns [code]null[/code] if the file could not be opened, use [method AsepriteFile.get_open_error] to get the error code.
 static func open(path: String, flags: AsepriteReader.ReadFlags = AsepriteReader.ReadFlags.DECOMPRESS) -> AsepriteFile:
 	var reader := AsepriteReader.new()
 	_last_open_error = reader.open(path, flags)
@@ -815,7 +816,23 @@ enum TagLoopDirection {
 class Tag extends RefCounted:
 	var from_frame: int = 0
 	var to_frame: int = 0
+
+	## Loop animation direction:
+	## [br] 0 = Forward
+	## [br] 1 = Reverse
+	## [br] 2 = Ping-pong
+	## [br] 3 = Ping-pong reverse
 	var loop_direction: TagLoopDirection
+
+	## Repeat N times. Play this animation section N times:
+	## [br]
+	## 0 = Doesn't specify (plays infinite in UI, once on export, for ping-pong it plays once in each direction)
+	## [br]
+	## 1 = Plays once (for ping-pong, it plays just in one direction)
+	## [br]
+	## 2 = Plays twice (for ping-pong, it plays once in one direction, and once in reverse)
+	## [br]
+	## n = Plays N times
 	var repeat: int = 0
 
 	## Deprecated, used only for backward compatibility with Aseprite v1.2.x
@@ -833,6 +850,7 @@ class Tag extends RefCounted:
 	## @deprecated
 	var color_b: int = 0
 
+	## Tag name
 	var name: String = ""
 
 
