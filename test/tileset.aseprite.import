@@ -7,10 +7,13 @@ path="res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0ff97.tr
 
 [deps]
 
-files=["res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0ff97.tres"]
-
 source_file="res://test/tileset.aseprite"
-dest_files=["res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0ff97.tres", "res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0ff97.tres"]
+dest_files=["res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0ff97.tres"]
 
 [params]
 
+export/enabled=false
+export/path=""
+tile_set/tile_shape=0
+tile_set/tile_layout=0
+tile_set/tile_offset_axis=0

@@ -2,7 +2,7 @@
 
 importer="aseprite.importer.texture2d"
 type="Texture2D"
-uid="uid://ci4ds4oo6rpey"
+uid="uid://ebgvilkm4p2r"
 path="res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae20e007b6dce.res"
 
 [deps]
@@ -12,4 +12,6 @@ dest_files=["res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae2
 
 [params]
 
-external/path="res://test/single_export.png"
+export/enabled=true
+export/path=""
+compress/mode=0
