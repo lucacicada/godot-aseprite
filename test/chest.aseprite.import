@@ -12,8 +12,18 @@ dest_files=["res://.godot/imported/chest.aseprite-39797ddab65eecf56c8e2cff23ec1a
 
 [params]
 
-nodes/root_type=""
+nodes/root_type="StaticBody2D"
 nodes/root_name=""
 nodes/root_script="uid://bgkgu2iwtoos5"
 sprites/offset=-1
 import/only_visible_layers=false
+collision/collision_layer=1
+collision/collision_mask=1
+collision/collision_priority=1.0
+occluder/sdf_collision=true
+occluder/occluder_light_mask=1
+navigation_obstacle/radius=0.0
+navigation_mesh/affect_navigation_mesh=false
+navigation_mesh/carve_navigation_mesh=false
+avoidance/avoidance_enabled=true
+avoidance/avoidance_layers=1

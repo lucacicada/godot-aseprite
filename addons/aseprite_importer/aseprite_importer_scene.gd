@@ -8,20 +8,28 @@ func _get_resource_type() -> String: return "PackedScene"
 func _get_save_extension() -> String: return "scn"
 func _get_priority() -> float: return 1.0
 func _get_import_order() -> int: return IMPORT_ORDER_DEFAULT
-func _get_preset_count() -> int: return 5
+func _get_preset_count() -> int: return 6
 func _get_preset_name(preset_index: int) -> String:
 	match preset_index:
 		1: return "Node2D"
 		2: return "StaticBody2D"
 		3: return "RigidBody2D"
-		4: return "Area2D"
+		4: return "CharacterBody2D"
+		5: return "Area2D"
 		_: return "Default"
 
-func _get_option_visibility(_path: String, _option_name: StringName, _options: Dictionary) -> bool:
+func _get_option_visibility(_path: String, option_name: StringName, options: Dictionary) -> bool:
 	return true
 
 func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
-	var root_types := ["", "Node2D", "StaticBody2D", "RigidBody2D", "Area2D"]
+	var root_types := [
+		"",
+		"Node2D",
+		"StaticBody2D",
+		"RigidBody2D",
+		"CharacterBody2D",
+		"Area2D"
+	]
 
 	var options: Array[Dictionary] = [
 		{
@@ -29,7 +37,9 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 			"default_value": root_types[preset_index] if preset_index >= 0 and preset_index < root_types.size() else root_types[0],
 			"property_hint": PROPERTY_HINT_TYPE_STRING,
 			"hint_string": "Node",
+			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
 		},
+
 		{
 			"name": "nodes/root_name",
 			"default_value": "",
@@ -59,7 +69,58 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 		},
 		{
 			"name": "import/only_visible_layers",
-			"default_value": false
+			"default_value": false,
+		},
+
+		{
+			"name": "collision/collision_layer",
+			"default_value": 1,
+			"property_hint": PROPERTY_HINT_LAYERS_2D_PHYSICS,
+		},
+		{
+			"name": "collision/collision_mask",
+			"default_value": 1,
+			"property_hint": PROPERTY_HINT_LAYERS_2D_PHYSICS,
+		},
+		{
+			"name": "collision/collision_priority",
+			"default_value": 1.0,
+		},
+
+		{
+			"name": "occluder/sdf_collision",
+			"default_value": true,
+		},
+		{
+			"name": "occluder/occluder_light_mask",
+			"default_value": 1,
+			"property_hint": PROPERTY_HINT_LAYERS_2D_RENDER
+		},
+
+		{
+			"name": "navigation_obstacle/radius",
+			"default_value": 0.0,
+			"property_hint": PROPERTY_HINT_RANGE,
+			"hint_string": "0.0,500,0.01,suffix:px"
+		},
+
+		{
+			"name": "navigation_mesh/affect_navigation_mesh",
+			"default_value": false,
+		},
+		{
+			"name": "navigation_mesh/carve_navigation_mesh",
+			"default_value": false,
+		},
+
+		{
+			"name": "avoidance/avoidance_enabled",
+			"default_value": true,
+		},
+		{
+			"name": "avoidance/avoidance_layers",
+			"default_value": 1,
+			"property_hint": PROPERTY_HINT_LAYERS_2D_NAVIGATION
 		},
 	]
 
@@ -130,6 +191,22 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	root_node.name = options_scene_root_name
 
+	if root_node is CollisionObject2D:
+		root_node.collision_layer = options.get("collision/collision_layer", 1)
+		root_node.collision_mask = options.get("collision/collision_mask", 1)
+		root_node.collision_priority = options.get("collision/collision_priority", 1.0)
+
+	if root_node is NavigationObstacle2D:
+		root_node.radius = options.get("navigation_obstacle/radius", 0.0)
+		root_node.avoidance_enabled = options.get("avoidance/avoidance_enabled", true)
+		root_node.avoidance_layers = options.get("avoidance/avoidance_layers", 1)
+		root_node.affect_navigation_mesh = options.get("navigation_mesh/affect_navigation_mesh", false)
+		root_node.carve_navigation_mesh = options.get("navigation_mesh/carve_navigation_mesh", false)
+
+	if root_node is LightOccluder2D:
+		root_node.sdf_collision = options.get("occluder/sdf_collision", true)
+		root_node.occluder_light_mask = options.get("occluder/occluder_light_mask", 1)
+
 	if not options_scene_root_script.is_empty():
 		var script_res := ResourceLoader.load(options_scene_root_script, "Script")
 		if script_res == null or not script_res is Script:
@@ -184,6 +261,12 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				navigation_obstacle.name = layer_node_name
 				navigation_obstacle.visible = layer.is_visible()
 
+				navigation_obstacle.radius = options.get("navigation_obstacle/radius", 0.0)
+				navigation_obstacle.avoidance_enabled = options.get("avoidance/avoidance_enabled", true)
+				navigation_obstacle.avoidance_layers = options.get("avoidance/avoidance_layers", 1)
+				navigation_obstacle.affect_navigation_mesh = options.get("navigation_mesh/affect_navigation_mesh", false)
+				navigation_obstacle.carve_navigation_mesh = options.get("navigation_mesh/carve_navigation_mesh", false)
+
 				# The outline vertices of the obstacle.
 				# If the vertices are winded in clockwise order agents will be pushed in by the obstacle, else they will be pushed out.
 				# Outlines can not be crossed or overlap.
@@ -231,6 +314,9 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				light_occluder.occluder_light_mask = 1
 				light_occluder.sdf_collision = true
 
+				light_occluder.sdf_collision = options.get("occluder/sdf_collision", true)
+				light_occluder.occluder_light_mask = options.get("occluder/occluder_light_mask", 1)
+
 				root_node.add_child(light_occluder, true)
 				light_occluder.owner = root_node
 
@@ -247,6 +333,10 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 			area2d.name = layer_node_name
 			area2d.visible = layer.is_visible()
+
+			area2d.collision_layer = options.get("collision/collision_layer", 1)
+			area2d.collision_mask = options.get("collision/collision_mask", 1)
+			area2d.collision_priority = options.get("collision/collision_priority", 1.0)
 
 			root_node.add_child(area2d, true)
 			area2d.owner = root_node
