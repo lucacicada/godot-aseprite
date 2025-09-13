@@ -3,7 +3,7 @@ extends EditorImportPlugin
 
 func _get_importer_name() -> String: return "aseprite.importer.texture2d"
 func _get_visible_name() -> String: return "Texture2D (Aseprite)"
-func _get_recognized_extensions() -> PackedStringArray: return ["aseprite", "ase"]
+func _get_recognized_extensions() -> PackedStringArray: return ["aseprite"]
 func _get_resource_type() -> String: return "Texture2D"
 func _get_save_extension() -> String: return "res"
 func _get_priority() -> float: return 2.0

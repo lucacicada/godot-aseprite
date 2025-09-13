@@ -5,7 +5,7 @@ func _get_importer_name() -> String: return "aseprite.importer.tileset"
 func _get_visible_name() -> String: return "TileSet (Aseprite)"
 func _get_recognized_extensions() -> PackedStringArray: return ["aseprite"]
 func _get_resource_type() -> String: return "TileSet"
-func _get_save_extension() -> String: return "tres"
+func _get_save_extension() -> String: return "res"
 func _get_priority() -> float: return 1.0
 func _get_import_order() -> int: return IMPORT_ORDER_DEFAULT
 func _get_preset_count() -> int: return 1
