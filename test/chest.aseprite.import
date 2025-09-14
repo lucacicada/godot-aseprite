@@ -1,6 +1,7 @@
 [remap]
 
-importer="aseprite.importer.scene"
+importer="scene"
+importer_version=1
 type="PackedScene"
 uid="uid://f5ba17x42sx4"
 path="res://.godot/imported/chest.aseprite-39797ddab65eecf56c8e2cff23ec1ac4.scn"
@@ -12,18 +13,44 @@ dest_files=["res://.godot/imported/chest.aseprite-39797ddab65eecf56c8e2cff23ec1a
 
 [params]
 
-nodes/root_type="StaticBody2D"
+nodes/root_type=""
 nodes/root_name=""
-nodes/root_script="uid://bgkgu2iwtoos5"
-sprites/offset=-1
-import/only_visible_layers=false
-collision/collision_layer=1
-collision/collision_mask=1
-collision/collision_priority=1.0
-occluder/sdf_collision=true
-occluder/occluder_light_mask=1
-navigation_obstacle/radius=0.0
-navigation_mesh/affect_navigation_mesh=false
-navigation_mesh/carve_navigation_mesh=false
-avoidance/avoidance_enabled=true
-avoidance/avoidance_layers=1
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_node_type_suffixes=true
+meshes/ensure_tangents=true
+meshes/generate_lods=true
+meshes/create_shadow_meshes=true
+meshes/light_baking=1
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=true
+animation/fps=30
+animation/trimming=false
+animation/remove_immutable_tracks=true
+animation/import_rest_as_RESET=false
+import_script/path=""
+_subresources={
+"nodes": {
+"PATH:Occlusion": {
+"node/type": "Control"
+}
+}
+}
+aseprite/nodes/root_script=""
+aseprite/sprites/offset=2
+aseprite/sprites/y_sort_origin=0.0
+aseprite/collision/collision_layer=1
+aseprite/collision/collision_mask=1
+aseprite/collision/collision_priority=1.0
+aseprite/occluder/sdf_collision=true
+aseprite/occluder/light_mask=1
+aseprite/occluder/polygon_closed=true
+aseprite/occluder/polygon_cull_mode=0
+aseprite/navigation_obstacle/radius=0.0
+aseprite/navigation_obstacle/affect_navigation_mesh=false
+aseprite/navigation_obstacle/carve_navigation_mesh=false
+aseprite/navigation_obstacle/avoidance_enabled=true
+aseprite/navigation_obstacle/avoidance_layers=1

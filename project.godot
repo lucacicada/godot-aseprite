@@ -14,13 +14,15 @@ config/name="Godot Aseprite"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="uid://o6ujc2n5j0m3"
 
-[aseprite]
-
-import/sprite_offset=2
-
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/aseprite_file/plugin.cfg", "res://addons/aseprite_importer/plugin.cfg")
+
+[importer_defaults]
+
+scene={
+&"aseprite/sprites/offset": 2
+}
 
 [rendering]
 

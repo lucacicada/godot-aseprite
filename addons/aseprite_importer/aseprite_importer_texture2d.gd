@@ -8,45 +8,38 @@ func _get_resource_type() -> String: return "Texture2D"
 func _get_save_extension() -> String: return "res"
 func _get_priority() -> float: return 2.0
 func _get_import_order() -> int: return IMPORT_ORDER_DEFAULT
-func _get_preset_count() -> int: return 2
-func _get_preset_name(preset_index: int) -> String:
-	match preset_index:
-		1: return "Export"
-		_: return "Default"
+func _get_preset_count() -> int: return 1
+func _get_preset_name(preset_index: int) -> String: return "Default"
 
 func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
-	if option_name == "export/path": return options.get("export/enabled", false)
-	if option_name.begins_with("compress/"): return not options.get("export/enabled", false)
+	# If path is empty, the user is editing the default project settings
+	if path.is_empty():
+		return true
+
+	if option_name == "save_to_file/path":
+		return options.get("save_to_file/enabled", false) == true
+
 	return true
 
 func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 	return [
 		{
-			"name": "export/enabled",
-			"default_value": preset_index == 1,
+			"name": "save_to_file/enabled",
+			"default_value": false,
 			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
 		},
 		{
-			"name": "export/path",
+			"name": "save_to_file/path",
 			"default_value": "",
 			"property_hint": PROPERTY_HINT_SAVE_FILE,
 			"hint_string": "*.png",
-			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
 		},
-		{
-			"name": "compress/mode",
-			"default_value": 0,
-			"property_hint": PROPERTY_HINT_ENUM,
-			"hint_string": "Lossless,Lossy,VRAM Compressed,VRAM Uncompressed,Basis Universal",
-			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
-		}
 	]
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
 
 	var ase := AsepriteFile.open(source_file)
-
 	if ase == null:
 		err = AsepriteFile.get_open_error()
 		push_error("Aseprite - Failed to open file: %s" % error_string(err))
@@ -60,48 +53,89 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		if layer.opacity == 0:
 			continue
 
+		if not layer.is_visible():
+			continue
+
 		if not layer.is_normal_layer():
 			continue
 
 		var img := ase.get_layer_frame_image(layer_index, 0)
 		canvas.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), Vector2i.ZERO)
 
-	if options.get("export/enabled", false):
-		var option_export_path: String = options.get("export/path", "")
+	var texture = null
 
-		# Automatically determine the export path if not set
-		if option_export_path.is_empty():
-			var basedir := source_file.get_base_dir()
-			var filename := source_file.get_file().get_basename() + ".png"
-			option_export_path = basedir.path_join(filename)
+	if options.get("save_to_file/enabled", false) == true:
+		var export_to_file_path := String(options.get("save_to_file/path", ""))
 
-		err = DirAccess.make_dir_recursive_absolute(option_export_path.get_base_dir())
+		# The user have not set a valid path
+		if export_to_file_path.is_empty():
+			push_error("Aseprite Importer - The export path is empty.")
+			return ERR_INVALID_PARAMETER
+
+		# Support for "uid://" paths
+		# Godot create a UID when setting a path from the file dialog
+		# On re-import, the path will be a "uid://" path
+		if export_to_file_path.begins_with("uid://"):
+			var uid := ResourceUID.text_to_id(export_to_file_path)
+
+			if uid == ResourceUID.INVALID_ID:
+				push_error("Aseprite Importer - Invalid export path UID: \"%s\"" % export_to_file_path)
+				return ERR_INVALID_PARAMETER
+
+			# Check if the UID has been loaded in the project
+			elif not ResourceUID.has_id(uid):
+				push_error("Aseprite Importer - Cannot find export path UID: \"%s\"" % export_to_file_path)
+				return ERR_INVALID_PARAMETER
+
+			export_to_file_path = ResourceUID.get_id_path(uid)
+
+			# Make the path is a resource file path
+			# :: is used for nested path in sub-resources, which is not supported here
+			if not export_to_file_path.begins_with("res://") or export_to_file_path.contains("::"):
+				push_error("Aseprite Importer - Invalid resource export path: \"%s\"" % export_to_file_path)
+				return ERR_INVALID_PARAMETER
+
+		var export_to_file_path_ext := export_to_file_path.get_extension().to_lower()
+
+		if export_to_file_path_ext not in ["png", "webp"]:
+			push_error("Aseprite Importer - Unsupported export file extension: \"%s\". Supported extensions are: .png, .webp." % export_to_file_path_ext)
+			return ERR_INVALID_PARAMETER
+
+		# Create the directory
+		# Godot typically create the directory from the file dialog
+		# It is safe to create a directory, we do not run the risk to delete existing files
+		err = DirAccess.make_dir_recursive_absolute(export_to_file_path.get_base_dir())
 		if err != OK:
 			return err
 
-		err = canvas.save_png(option_export_path)
+		match export_to_file_path_ext:
+			"jpg", "jpeg":
+				err = canvas.save_jpg(export_to_file_path)
+			"webp":
+				err = canvas.save_webp(export_to_file_path)
+			_:
+				err = canvas.save_png(export_to_file_path)
+
 		if err != OK:
 			return err
 
-		EditorInterface.get_resource_filesystem().update_file(option_export_path)
+		EditorInterface.get_resource_filesystem().update_file(export_to_file_path)
 
-		err = append_import_external_resource(option_export_path)
+		err = append_import_external_resource(export_to_file_path)
 		if err != OK:
 			return err
 
-		var texture := ResourceLoader.load(option_export_path, "Texture2D", ResourceLoader.CACHE_MODE_REPLACE)
+		texture = ResourceLoader.load(export_to_file_path, "Texture2D", ResourceLoader.CACHE_MODE_REPLACE)
+
 		if texture == null:
 			return ERR_CANT_ACQUIRE_RESOURCE
 
-		err = ResourceSaver.save(texture, save_path + "." + _get_save_extension())
+		if not texture is Texture2D:
+			return ERR_CANT_ACQUIRE_RESOURCE
 
-		if err != OK:
-			return err
-
-		return err
-
-	var texture := PortableCompressedTexture2D.new()
-	texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+	else:
+		texture = PortableCompressedTexture2D.new()
+		texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
 
 	err = ResourceSaver.save(texture, save_path + "." + _get_save_extension())
 

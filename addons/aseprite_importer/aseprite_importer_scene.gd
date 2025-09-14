@@ -1,232 +1,295 @@
+## Importer for Aseprite's [code].aseprite[/code] scene file format.
+
 @tool
-extends EditorImportPlugin
+class_name EditorSceneFormatImporterAseprite
+extends EditorSceneFormatImporter
 
-func _get_importer_name() -> String: return "aseprite.importer.scene"
-func _get_visible_name() -> String: return "Scene (Aseprite)"
-func _get_recognized_extensions() -> PackedStringArray: return ["aseprite"]
-func _get_resource_type() -> String: return "PackedScene"
-func _get_save_extension() -> String: return "scn"
-func _get_priority() -> float: return 1.0
-func _get_import_order() -> int: return IMPORT_ORDER_DEFAULT
-func _get_preset_count() -> int: return 6
-func _get_preset_name(preset_index: int) -> String:
-	match preset_index:
-		1: return "Node2D"
-		2: return "StaticBody2D"
-		3: return "RigidBody2D"
-		4: return "CharacterBody2D"
-		5: return "Area2D"
-		_: return "Default"
+func _get_extensions() -> PackedStringArray: return ["aseprite"]
 
-func _get_option_visibility(_path: String, option_name: StringName, options: Dictionary) -> bool:
+# Hide default options that are unused
+#
+# For a list of built-in options, see:
+# https://github.com/godotengine/godot/blob/4.4/editor/import/3d/resource_importer_scene.cpp#L2384
+func _get_option_visibility(path: String, _for_animation: bool, option: String):
+	# Only toggle visibility for .aseprite files
+	if path.is_empty() or not path.get_extension().to_lower() in _get_extensions():
+		return null
+
+	if option in [
+		"nodes/root_type",
+		"nodes/root_name",
+		"nodes/root_script",
+	]:
+		return true
+
+	for prefix in [
+		"nodes/",
+		"animation/",
+		"materials/",
+		"skins/",
+		"meshes/",
+		"import_script/",
+	]:
+		if option.begins_with(prefix):
+			return false
+
 	return true
 
-func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
-	var root_types := [
+func _get_import_options(path: String) -> void:
+	# Only show the options for .aseprite files or when the path is empty indicating the user is browsing the project settings
+	if not path.is_empty() and not path.get_extension().to_lower() in _get_extensions():
+		return
+
+	add_import_option_advanced(
+		TYPE_STRING,
+		"aseprite/nodes/root_script",
 		"",
-		"Node2D",
-		"StaticBody2D",
-		"RigidBody2D",
-		"CharacterBody2D",
-		"Area2D"
-	]
+		PROPERTY_HINT_FILE,
+		"*.gd",
+	)
 
-	var options: Array[Dictionary] = [
-		{
-			"name": "nodes/root_type",
-			"default_value": root_types[preset_index] if preset_index >= 0 and preset_index < root_types.size() else root_types[0],
-			"property_hint": PROPERTY_HINT_TYPE_STRING,
-			"hint_string": "Node",
-			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
-		},
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/sprites/offset",
+		Control.PRESET_CENTER,
+		PROPERTY_HINT_ENUM,
+		"Top Left:%d,Top Right:%d,Bottom Left:%d,Bottom Right:%d,Center Left:%d,Center Top:%d,Center Right:%d,Center Bottom:%d,Center:%d"
+		% [
+			Control.PRESET_TOP_LEFT,
+			Control.PRESET_TOP_RIGHT,
+			Control.PRESET_BOTTOM_LEFT,
+			Control.PRESET_BOTTOM_RIGHT,
+			Control.PRESET_CENTER_LEFT,
+			Control.PRESET_CENTER_TOP,
+			Control.PRESET_CENTER_RIGHT,
+			Control.PRESET_CENTER_BOTTOM,
+			Control.PRESET_CENTER,
+		],
+	)
+	add_import_option_advanced(
+		TYPE_FLOAT,
+		"aseprite/sprites/y_sort_origin",
+		0.0,
+	)
 
-		{
-			"name": "nodes/root_name",
-			"default_value": "",
-		},
-		{
-			"name": "nodes/root_script",
-			"default_value": "",
-			"property_hint": PROPERTY_HINT_FILE,
-			"hint_string": "*.gd",
-		},
-		{
-			"name": "sprites/offset",
-			"default_value": - 1,
-			"property_hint": PROPERTY_HINT_ENUM,
-			"hint_string": "Default:-1,Top Left:%d,Top Right:%d,Bottom Left:%d,Bottom Right:%d,Center Left:%d,Center Top:%d,Center Right:%d,Center Bottom:%d,Center:%d"
-			% [
-				Control.PRESET_TOP_LEFT,
-				Control.PRESET_TOP_RIGHT,
-				Control.PRESET_BOTTOM_LEFT,
-				Control.PRESET_BOTTOM_RIGHT,
-				Control.PRESET_CENTER_LEFT,
-				Control.PRESET_CENTER_TOP,
-				Control.PRESET_CENTER_RIGHT,
-				Control.PRESET_CENTER_BOTTOM,
-				Control.PRESET_CENTER,
-			]
-		},
-		{
-			"name": "import/only_visible_layers",
-			"default_value": false,
-		},
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/collision/collision_layer",
+		1,
+		PROPERTY_HINT_LAYERS_2D_PHYSICS,
+	)
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/collision/collision_mask",
+		1,
+		PROPERTY_HINT_LAYERS_2D_PHYSICS,
+	)
+	add_import_option_advanced(
+		TYPE_FLOAT,
+		"aseprite/collision/collision_priority",
+		1.0,
+	)
 
-		{
-			"name": "collision/collision_layer",
-			"default_value": 1,
-			"property_hint": PROPERTY_HINT_LAYERS_2D_PHYSICS,
-		},
-		{
-			"name": "collision/collision_mask",
-			"default_value": 1,
-			"property_hint": PROPERTY_HINT_LAYERS_2D_PHYSICS,
-		},
-		{
-			"name": "collision/collision_priority",
-			"default_value": 1.0,
-		},
+	add_import_option_advanced(
+		TYPE_BOOL,
+		"aseprite/occluder/sdf_collision",
+		true,
+	)
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/occluder/light_mask",
+		1,
+		PROPERTY_HINT_LAYERS_2D_RENDER,
+	)
+	add_import_option_advanced(
+		TYPE_BOOL,
+		"aseprite/occluder/polygon_closed",
+		true,
+	)
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/occluder/polygon_cull_mode",
+		OccluderPolygon2D.CULL_DISABLED,
+		PROPERTY_HINT_ENUM,
+		"Disabled,ClockWise,CounterClockWise"
+	)
 
-		{
-			"name": "occluder/sdf_collision",
-			"default_value": true,
-		},
-		{
-			"name": "occluder/occluder_light_mask",
-			"default_value": 1,
-			"property_hint": PROPERTY_HINT_LAYERS_2D_RENDER
-		},
+	add_import_option_advanced(
+		TYPE_FLOAT,
+		"aseprite/navigation_obstacle/radius",
+		0.0,
+		PROPERTY_HINT_RANGE,
+		"0.0,500,0.01,suffix:px",
+	)
+	add_import_option_advanced(
+		TYPE_BOOL,
+		"aseprite/navigation_obstacle/affect_navigation_mesh",
+		false,
+	)
+	add_import_option_advanced(
+		TYPE_BOOL,
+		"aseprite/navigation_obstacle/carve_navigation_mesh",
+		false,
+	)
+	add_import_option_advanced(
+		TYPE_BOOL,
+		"aseprite/navigation_obstacle/avoidance_enabled",
+		true,
+	)
+	add_import_option_advanced(
+		TYPE_INT,
+		"aseprite/navigation_obstacle/avoidance_layers",
+		1,
+		PROPERTY_HINT_LAYERS_AVOIDANCE,
+	)
 
-		{
-			"name": "navigation_obstacle/radius",
-			"default_value": 0.0,
-			"property_hint": PROPERTY_HINT_RANGE,
-			"hint_string": "0.0,500,0.01,suffix:px"
-		},
-
-		{
-			"name": "navigation_mesh/affect_navigation_mesh",
-			"default_value": false,
-		},
-		{
-			"name": "navigation_mesh/carve_navigation_mesh",
-			"default_value": false,
-		},
-
-		{
-			"name": "avoidance/avoidance_enabled",
-			"default_value": true,
-		},
-		{
-			"name": "avoidance/avoidance_layers",
-			"default_value": 1,
-			"property_hint": PROPERTY_HINT_LAYERS_2D_NAVIGATION
-		},
-	]
-
-	return options
-
-func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
-	var err := OK
-
-	var ase := AsepriteFile.open(source_file)
-
+func _import_scene(path: String, _flags: int, options: Dictionary) -> Object:
+	var ase := AsepriteFile.open(path)
 	if ase == null:
-		err = AsepriteFile.get_open_error()
-		return err
+		push_error("Failed to open Aseprite file: %s" % error_string(AsepriteFile.get_open_error()))
+		return null
+
+	var options_y_sort_origin: float = options.get("aseprite/sprites/y_sort_origin", 0.0)
+	var options_sprite_offset: int = options.get("aseprite/sprites/offset", Control.PRESET_CENTER)
 
 	var options_scene_root_type: String = options.get("nodes/root_type", "")
-	var options_scene_root_name: String = options.get("nodes/root_name", "")
-	var options_scene_root_script: String = options.get("nodes/root_script", "")
-	var options_sprite_offset: int = options.get("sprites/offset", Control.PRESET_CENTER)
+
+	var root_script: Script = null
+	var root_script_path: String = options.get("nodes/root_script", "")
+	if not root_script_path.is_empty():
+		var script := ResourceLoader.load(root_script_path, "Script")
+		if script is Script:
+			root_script = script
 
 	# Validate the root node name
-	options_scene_root_name = options_scene_root_name.strip_escapes().strip_edges().validate_node_name()
-	options_scene_root_name = "Node2D" if options_scene_root_name.is_empty() else options_scene_root_name
-
-	# Use the project settings default if the option is set to -1
-	if options_sprite_offset < 0:
-		options_sprite_offset = ProjectSettings.get_setting("aseprite/import/sprite_offset", Control.PRESET_CENTER)
-
-	# Automatically determine the root node type if not specified
 	if options_scene_root_type.is_empty():
-		# Hight priority to CharacterBody2D if a layer with that name exists
-		if ase.layers.any(func(layer: AsepriteFile.Layer):
-			return layer.type == AsepriteFile.LAYER_TYPE_NORMAL and layer.opacity > 0 and not layer.name.ends_with("-noimp") and layer.name.containsn("CharacterBody2D")
-		):
-			options_scene_root_type = "CharacterBody2D"
+		# Guess the node type
+		options_scene_root_type = "Node2D"
 
-		# We have a collision layer, use StaticBody2D as the root node
-		elif ase.layers.any(func(layer: AsepriteFile.Layer):
-			return layer.type == AsepriteFile.LAYER_TYPE_NORMAL and layer.opacity > 0 and not layer.name.ends_with("-noimp") and layer.name.containsn("Collision")
-		):
-			var hint_idle := ase.tags.any(func(tag: AsepriteFile.Tag): return tag.name.containsn("idle"))
-			if hint_idle:
-				options_scene_root_type = "CharacterBody2D"
-			else:
-				options_scene_root_type = "StaticBody2D"
+		var hint_character := ase.layers.any(func(layer: AsepriteFile.Layer) -> bool:
+			if layer.child_level == 0 and (layer.name.containsn("player") or layer.name.containsn("character") or layer.name.containsn("hero") or layer.name.containsn("main")):
+				return true
+			return false
+		)
 
-		# We have an Area2D layer, use Area2D as the root node
-		elif ase.layers.any(func(layer: AsepriteFile.Layer):
-			return layer.type == AsepriteFile.LAYER_TYPE_NORMAL and layer.opacity > 0 and not layer.name.ends_with("-noimp") and (
-				layer.name.containsn("Area2D") or
-				layer.name.containsn("HitBox") or
-				layer.name.containsn("HurtBox")
-			)
-		):
-			options_scene_root_type = "Area2D"
+		var hint_collision := ase.layers.any(func(layer: AsepriteFile.Layer) -> bool:
+			if layer.child_level == 0 and layer.name.containsn("collision"):
+				return true
+			return false
+		)
 
-		# Default to Node2D
-		else:
-			options_scene_root_type = "Node2D"
+		if hint_character: options_scene_root_type = "CharacterBody2D"
+		elif hint_collision: options_scene_root_type = "StaticBody2D"
 
-	var root_node: Node = null
+		# If we have a custom script, guess its type by default
+		if root_script:
+			var script_base_type := root_script.get_instance_base_type()
+			if ClassDB.is_parent_class(script_base_type, "Node"):
+				options_scene_root_type = script_base_type
 
-	if ClassDB.can_instantiate(options_scene_root_type):
-		root_node = ClassDB.instantiate(options_scene_root_type) as Node
+	if options_scene_root_type != "Node":
+		# Sanity check, ensure the class actually exists
+		if not ClassDB.class_exists(options_scene_root_type):
+			push_error("Aseprite Importer - Root must be a Node, got \"%s\"" % options_scene_root_type)
+			return null
 
-	if root_node == null:
-		push_warning("Aseprite Importer - Invalid root node type: \"%s\", fallback to Node2D" % options_scene_root_type)
-		root_node = Node2D.new()
+		if not ClassDB.can_instantiate(options_scene_root_type):
+			push_error("Aseprite Importer - Root type is \"%s\" not instantiable" % options_scene_root_type)
+			return null
 
-	root_node.name = options_scene_root_name
+		# We must have a Node root
+		if not ClassDB.is_parent_class(options_scene_root_type, "Node"):
+			push_error("Aseprite Importer - Root must be a Node, got \"%s\"" % options_scene_root_type)
+			return null
+
+		# No 3D nodes allowed, they will break the importer
+		if ClassDB.is_parent_class(options_scene_root_type, "Node3D"):
+			push_error("Aseprite Importer - 3D nodes are not supported")
+			return null
+
+	var root_node := ClassDB.instantiate(options_scene_root_type) as Node
+
+	assert(root_node is Node, "unexpected \"is_parent_class check\" failure")
+
+	root_node.name = path.get_file().get_basename().to_pascal_case()
+
+	# var root_script: String = options.get("nodes/root_script", "")
+	# if not root_script.is_empty():
+	# 	var script := ResourceLoader.load(root_script)
+	# 	if script is Script:
+	# 		root_node.set_script(script)
+	# 	else:
+	# 		push_warning("Aseprite Importer - Failed to load root script")
 
 	if root_node is CollisionObject2D:
 		root_node.collision_layer = options.get("collision/collision_layer", 1)
 		root_node.collision_mask = options.get("collision/collision_mask", 1)
 		root_node.collision_priority = options.get("collision/collision_priority", 1.0)
 
+	if root_node is LightOccluder2D:
+		root_node.occluder_light_mask = options.get("occluder/light_mask", 1)
+		root_node.sdf_collision = options.get("occluder/sdf_collision", true)
+
 	if root_node is NavigationObstacle2D:
 		root_node.radius = options.get("navigation_obstacle/radius", 0.0)
-		root_node.avoidance_enabled = options.get("avoidance/avoidance_enabled", true)
-		root_node.avoidance_layers = options.get("avoidance/avoidance_layers", 1)
-		root_node.affect_navigation_mesh = options.get("navigation_mesh/affect_navigation_mesh", false)
-		root_node.carve_navigation_mesh = options.get("navigation_mesh/carve_navigation_mesh", false)
-
-	if root_node is LightOccluder2D:
-		root_node.sdf_collision = options.get("occluder/sdf_collision", true)
-		root_node.occluder_light_mask = options.get("occluder/occluder_light_mask", 1)
-
-	if not options_scene_root_script.is_empty():
-		var script_res := ResourceLoader.load(options_scene_root_script, "Script")
-		if script_res == null or not script_res is Script:
-			push_warning("Aseprite Importer - Failed to load script: %s" % options_scene_root_script)
-		else:
-			root_node.set_script(script_res as Script)
+		root_node.avoidance_enabled = options.get("navigation_obstacle/avoidance_enabled", true)
+		root_node.avoidance_layers = options.get("navigation_obstacle/avoidance_layers", 1)
+		root_node.affect_navigation_mesh = options.get("navigation_obstacle/affect_navigation_mesh", false)
+		root_node.carve_navigation_mesh = options.get("navigation_obstacle/carve_navigation_mesh", false)
 
 	for layer_index in range(ase.layers.size()):
 		var layer := ase.layers[layer_index]
 
-		# Skip GROUP and TILEMAP layers
 		if layer.type != AsepriteFile.LAYER_TYPE_NORMAL:
 			continue
 
-		# Skip layer with 0 opacity or marked as no import
-		if layer.opacity == 0 or layer.name.ends_with("-noimp"):
+		if layer.opacity == 0:
 			continue
 
+		if layer.name.ends_with("-noimp"):
+			continue
+
+		if ase.is_layer_frame_empty(layer_index, 0):
+			continue
+
+		if layer.name.replace("_", "").replace("-", "").containsn("YSort"):
+			var img := ase.get_layer_frame_image(layer_index, 0)
+
+			var y_sort := 0
+
+			# Find the y-sort, scan the image, the first row that has all transparent pixels is the y-sort
+			for y in range(img.get_height()):
+				var all_transparent := true
+				for x in range(img.get_width()):
+					if img.get_pixelv(Vector2i(x, y)).a > 0.0:
+						all_transparent = false
+						break
+				if all_transparent:
+					y_sort = y
+					break
+
+			options_y_sort_origin = ase.height - y_sort
+
+			break
+
+	for layer_index in range(ase.layers.size()):
+		var layer := ase.layers[layer_index]
 		var layer_node_name := layer.name.strip_escapes().strip_edges().validate_node_name()
-		layer_node_name = "Layer_%d" % layer_index if layer_node_name.is_empty() else layer_node_name
+
+		if layer.type != AsepriteFile.LAYER_TYPE_NORMAL:
+			continue
+
+		if layer.opacity == 0:
+			continue
+
+		if layer.name.ends_with("-noimp"):
+			continue
+
+		if ase.is_layer_frame_empty(layer_index, 0):
+			continue
+
+		if layer.name.replace("_", "").replace("-", "").containsn("YSort"):
+			continue
 
 		if layer.name.containsn("Obstacle"):
 			var collision_bitmap = BitMap.new()
@@ -262,10 +325,10 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				navigation_obstacle.visible = layer.is_visible()
 
 				navigation_obstacle.radius = options.get("navigation_obstacle/radius", 0.0)
-				navigation_obstacle.avoidance_enabled = options.get("avoidance/avoidance_enabled", true)
-				navigation_obstacle.avoidance_layers = options.get("avoidance/avoidance_layers", 1)
-				navigation_obstacle.affect_navigation_mesh = options.get("navigation_mesh/affect_navigation_mesh", false)
-				navigation_obstacle.carve_navigation_mesh = options.get("navigation_mesh/carve_navigation_mesh", false)
+				navigation_obstacle.avoidance_enabled = options.get("navigation_obstacle/avoidance_enabled", true)
+				navigation_obstacle.avoidance_layers = options.get("navigation_obstacle/avoidance_layers", 1)
+				navigation_obstacle.affect_navigation_mesh = options.get("navigation_obstacle/affect_navigation_mesh", false)
+				navigation_obstacle.carve_navigation_mesh = options.get("navigation_obstacle/carve_navigation_mesh", false)
 
 				# The outline vertices of the obstacle.
 				# If the vertices are winded in clockwise order agents will be pushed in by the obstacle, else they will be pushed out.
@@ -279,7 +342,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 			continue
 
-		elif layer.name.containsn("Occlude") or layer.name.containsn("Occlusion"):
+		if layer.name.containsn("Occlude") or layer.name.containsn("Occlusion"):
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(ase.get_layer_frame_image(layer_index, 0))
 			var polygons := collision_bitmap.opaque_to_polygons(Rect2(Vector2(), collision_bitmap.get_size()))
@@ -321,14 +384,15 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				light_occluder.owner = root_node
 
 				var occluder_polygon := OccluderPolygon2D.new()
+				occluder_polygon.closed = options.get("occluder/polygon_closed", true)
+				occluder_polygon.cull_mode = options.get("occluder/polygon_cull_mode", OccluderPolygon2D.CULL_DISABLED)
 				occluder_polygon.polygon = points
-				occluder_polygon.cull_mode = OccluderPolygon2D.CULL_DISABLED
 
 				light_occluder.occluder = occluder_polygon
 
 			continue
 
-		elif layer.name.containsn("Area2D") or layer.name.containsn("HitBox") or layer.name.containsn("HurtBox"):
+		if layer.name.containsn("Area2D") or layer.name.containsn("HitBox") or layer.name.containsn("HurtBox"):
 			var area2d := Area2D.new()
 
 			area2d.name = layer_node_name
@@ -379,10 +443,9 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 			continue
 
-		elif layer.name.containsn("Collision"):
+		if layer.name.containsn("Collision"):
 			var collision_bitmap = BitMap.new()
 			collision_bitmap.create_from_image_alpha(ase.get_layer_frame_image(layer_index, 0))
-
 			var polygons := collision_bitmap.opaque_to_polygons(Rect2(Vector2(), collision_bitmap.get_size()))
 
 			# Offset the points, the polygons are aligned top-left when created from bitmap
@@ -410,6 +473,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			for points in polygons:
 				var collision_polygon := CollisionPolygon2D.new()
 
+				# collision_polygon.unique_name_in_owner = true
 				collision_polygon.name = layer_node_name
 				collision_polygon.polygon = points
 
@@ -418,20 +482,28 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 			continue
 
-		# Sprite or AnimatedSprite
-		elif ase.frames.size() == 1:
+		var unique_frame_count := 0
+		for frame_index in range(ase.frames.size()):
+			var frame := ase.frames[frame_index]
+
+			var cels := frame.cels.filter(func(cel: AsepriteFile.Cel): return cel.layer_index == layer_index)
+			var cels_all_linked := cels.all(func(cel: AsepriteFile.Cel): return cel.type == AsepriteFile.CEL_TYPE_LINKED)
+
+			if cels_all_linked:
+				continue
+
+			unique_frame_count += 1
+
+		if unique_frame_count == 0:
+			continue
+
+		# Sprite2D
+		if unique_frame_count == 1:
 			var sprite := Sprite2D.new()
-
-			sprite.name = layer_node_name
 			sprite.visible = layer.is_visible()
-
+			sprite.name = layer_node_name
 			root_node.add_child(sprite, true)
 			sprite.owner = root_node
-
-			var texture := PortableCompressedTexture2D.new()
-			texture.create_from_image(ase.get_layer_frame_image(layer_index, 0), PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
-
-			sprite.texture = texture
 
 			match options_sprite_offset:
 				Control.PRESET_TOP_LEFT:
@@ -462,14 +534,28 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 					sprite.centered = true
 					sprite.offset = Vector2(0, 0)
 
-		else:
+			sprite.offset.y += options_y_sort_origin
+
+			var layer_image := ase.get_layer_frame_image(layer_index, 0)
+			var texture := PortableCompressedTexture2D.new()
+			texture.create_from_image(layer_image, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+			sprite.texture = texture
+
+			continue
+
+		if unique_frame_count > 1:
 			var animated_sprite := AnimatedSprite2D.new()
-
-			animated_sprite.name = layer_node_name
 			animated_sprite.visible = layer.is_visible()
-
+			animated_sprite.name = layer_node_name
 			root_node.add_child(animated_sprite, true)
 			animated_sprite.owner = root_node
+
+			var sprite_frames := SpriteFrames.new()
+			animated_sprite.frames = sprite_frames
+
+			# Clear any existing animations such as "default"
+			for anim in sprite_frames.get_animation_names():
+				sprite_frames.remove_animation(anim)
 
 			match options_sprite_offset:
 				Control.PRESET_TOP_LEFT:
@@ -500,8 +586,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 					animated_sprite.centered = true
 					animated_sprite.offset = Vector2(0, 0)
 
-			var sprite_frames := SpriteFrames.new()
-			animated_sprite.sprite_frames = sprite_frames
+			animated_sprite.offset += Vector2(0, options_y_sort_origin)
 
 			if ase.tags.size() > 0:
 				for tag_index in range(ase.tags.size()):
@@ -521,7 +606,10 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 					var fps := 1000.0 / (duration / frames_count)
 
-					var atlas := ImageTexture.create_from_image(canvas)
+					# var atlas := ImageTexture.create_from_image(canvas)
+					var texture := PortableCompressedTexture2D.new()
+					texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+					var atlas := texture
 
 					var animation_name := tag.name.validate_node_name().strip_escapes().strip_edges().to_snake_case()
 
@@ -562,7 +650,10 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 				var fps := 1000.0 / (duration / frames_count)
 
-				var atlas := ImageTexture.create_from_image(canvas)
+				# var atlas := ImageTexture.create_from_image(canvas)
+				var texture := PortableCompressedTexture2D.new()
+				texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
+				var atlas := texture
 
 				var animation_name := layer.name.validate_node_name().strip_escapes().strip_edges().to_snake_case()
 
@@ -588,15 +679,85 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 					sprite_frames.add_frame(animation_name, atlas_texture)
 
-	var scene := PackedScene.new()
-	err = scene.pack(root_node)
+			continue
 
-	if err != OK:
-		return err
+	# Add the debug importer node
+	if root_node is Node2D:
+		var importer := ImporterRoot.new()
+		importer.name = "PreviewDebugNode"
 
-	err = ResourceSaver.save(scene, save_path + "." + _get_save_extension())
+		importer.size = Vector2(ase.width, ase.height)
 
-	if err != OK:
-		return err
+		match options_sprite_offset:
+			Control.PRESET_TOP_LEFT: importer.anchor = Vector2(ase.width / 2.0, ase.height / 2.0)
+			Control.PRESET_TOP_RIGHT: importer.anchor = Vector2(-ase.width / 2.0, ase.height / 2.0)
+			Control.PRESET_BOTTOM_LEFT: importer.anchor = Vector2(ase.width / 2.0, -ase.height / 2.0)
+			Control.PRESET_BOTTOM_RIGHT: importer.anchor = Vector2(-ase.width / 2.0, -ase.height / 2.0)
+			Control.PRESET_CENTER_LEFT: importer.anchor = Vector2(ase.width / 2.0, 0)
+			Control.PRESET_CENTER_TOP: importer.anchor = Vector2(0, ase.height / 2.0)
+			Control.PRESET_CENTER_RIGHT: importer.anchor = Vector2(-ase.width / 2.0, 0)
+			Control.PRESET_CENTER_BOTTOM: importer.anchor = Vector2(0, -ase.height / 2.0)
 
-	return err
+		importer.anchor += Vector2(0, options_y_sort_origin)
+
+		root_node.add_child(importer, true, Node.INTERNAL_MODE_BACK)
+
+	return root_node
+
+# Debug node, to render 2d-nodes in a viewport properly
+class ImporterRoot extends Node2D:
+	var size: Vector2
+	var anchor: Vector2
+
+	func _ready() -> void:
+		z_index = RenderingServer.CANVAS_ITEM_Z_MAX
+
+		var canvas := CanvasLayer.new()
+		canvas.layer = -1
+		add_child(canvas)
+
+		var color_rect := ColorRect.new()
+		color_rect.color = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color", Color(0.3, 0.3, 0.3, 1))
+		color_rect.anchor_top = 0.0
+		color_rect.anchor_bottom = 1.0
+		color_rect.anchor_left = 0.0
+		color_rect.anchor_right = 1.0
+		canvas.add_child(color_rect)
+
+		# Correct the parten texture_filter
+		var parent := get_parent() as Node2D
+		if parent:
+			parent.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+		if not is_inside_tree():
+			return
+
+		var parent := get_parent() as Node2D
+		if parent == null or not parent.is_inside_tree():
+			return
+
+		var viewport := parent.get_viewport()
+		if viewport == null:
+			return
+
+		var viewport_size := viewport.get_visible_rect().size
+
+		# Center and scale the parent node to fit in the viewport
+		var scale := minf(viewport_size.x / size.x, viewport_size.y / size.y) * 0.9
+		parent.scale = Vector2(scale, scale)
+
+		var viewport_center := viewport_size / 2
+		parent.position = viewport_center - anchor * scale
+
+	func _draw() -> void:
+		# draw the bounding box in thin gray
+		var bounding_box := Rect2(-size / 2.0, size)
+		bounding_box.position += anchor
+
+		draw_rect(bounding_box, Color(0.5, 0.5, 0.5, 1.0), false, 1.0 / global_scale.x)
+
+		# Draw the y-sort origin line
+		draw_line(Vector2(bounding_box.position.x, 0), Vector2(bounding_box.position.x + bounding_box.size.x, 0), Color.MAGENTA, 2.0 / global_scale.x)

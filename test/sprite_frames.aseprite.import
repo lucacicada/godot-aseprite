@@ -1,0 +1,17 @@
+[remap]
+
+importer="aseprite.importer.spriteframes"
+type="SpriteFrames"
+uid="uid://ncr1snurn1fl"
+path="res://.godot/imported/sprite_frames.aseprite-e855fd91befa86b142b33a032c5baf95.res"
+
+[deps]
+
+source_file="res://test/sprite_frames.aseprite"
+dest_files=["res://.godot/imported/sprite_frames.aseprite-e855fd91befa86b142b33a032c5baf95.res"]
+
+[params]
+
+save_to_file/enabled=true
+save_to_file/path="uid://vu1se7qwyf0k"
+packing/type=0
