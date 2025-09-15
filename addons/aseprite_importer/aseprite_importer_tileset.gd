@@ -12,8 +12,15 @@ func _get_preset_count() -> int: return 1
 func _get_preset_name(preset_index: int) -> String: return "Default"
 
 func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
-	if option_name == "export/path":
-		return options.get("export/enabled", false)
+	# If path is empty, the user is editing the default project settings
+	if path.is_empty():
+		# Hide all options related to saving to file
+		# these options make sense only when importing a specific file
+		if option_name.begins_with("save_to_file/"):
+			return false
+
+	if option_name == "save_to_file/path":
+		return options.get("save_to_file/enabled", false) == true
 
 	if option_name == "tile_set/tile_layout":
 		return options.get("tile_set/tile_shape", TileSet.TILE_SHAPE_SQUARE) != TileSet.TILE_SHAPE_SQUARE
@@ -26,17 +33,18 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 	var options: Array[Dictionary] = [
 		{
-			"name": "export/enabled",
+			"name": "save_to_file/enabled",
 			"default_value": false,
 			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
 		},
 		{
-			"name": "export/path",
+			"name": "save_to_file/path",
 			"default_value": "",
 			"property_hint": PROPERTY_HINT_SAVE_FILE,
 			"hint_string": "*.png",
 			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
 		},
+
 		{
 			"name": "tile_set/tile_shape",
 			"default_value": TileSet.TILE_SHAPE_SQUARE,
@@ -73,7 +81,49 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		push_error("Aseprite - No tilesets found in file, convert a layer into a tilemap in Aseprite first.")
 		return ERR_INVALID_DATA
 
+	# Print info about tilesets, this can help the user debug issues
+	# since tilesets are buggy in Aseprite
+	for tileset_index in range(ase.tilesets.size()):
+		var tileset := ase.tilesets[tileset_index]
+
+		print_rich("[color=#808080]Tileset: Index %d, Name \"%s\", Tile Size %dx%d, Tiles Count: %d[/color]" % [
+			tileset_index,
+			tileset.name,
+			tileset.tile_width,
+			tileset.tile_height,
+			tileset.tiles_count,
+		])
+
+		for layer_index in range(ase.layers.size()):
+			var layer := ase.layers[layer_index]
+			if layer.type != AsepriteFile.LAYER_TYPE_TILEMAP:
+				continue
+			if layer.tileset_index != tileset_index:
+				continue
+
+			print_rich("[color=#808080]  Used in Tilemap Layer: Index %d, Name \"%s\"[/color]" % [
+				layer_index,
+				layer.name,
+			])
+
 	var tile_set := TileSet.new()
+
+	for tileset_index in range(ase.tilesets.size()):
+		var tileset := ase.tilesets[tileset_index]
+
+		tile_set.add_terrain_set()
+		tile_set.set_terrain_set_mode(tileset_index, TileSet.TERRAIN_MODE_MATCH_CORNERS_AND_SIDES)
+
+		var terrain_layers: Array[AsepriteFile.Layer] = ase.layers.filter(func(layer):
+			return layer.type == AsepriteFile.LAYER_TYPE_TILEMAP and layer.tileset_index == tileset_index
+		)
+
+		for terrain_index in range(terrain_layers.size()):
+			var layer := terrain_layers[terrain_index]
+
+			tile_set.add_terrain(tileset_index)
+			tile_set.set_terrain_name(tileset_index, terrain_index, layer.name)
+
 
 	# Use the first tileset to set the tile size
 	for tileset in ase.tilesets:
@@ -98,6 +148,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		tile_set_atlas_source.texture_region_size = Vector2i(tileset.tile_width, tileset.tile_height)
 		tile_set_atlas_source.separation = Vector2i(0, 0)
 		tile_set_atlas_source.margins = Vector2i(0, 0)
+		tile_set_atlas_source.resource_name = layer.name
 
 		for x in range(ase.width / tileset.tile_width):
 			for y in range(canvas.get_height() / tileset.tile_height):

@@ -199,8 +199,12 @@ func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
 	)
 
 	for index in range(cels.size()):
+		var original_cel_index := self.frames[frame_index].cels.find(cels[index])
+
+		assert(original_cel_index != -1, "Aseprite - Internal error: Cel not found in frame")
+
 		var cel := cels[index]
-		var img := get_frame_cel_image(frame_index, self.frames[frame_index].cels.find(cels[index]))
+		var img := get_frame_cel_image(frame_index, original_cel_index)
 
 		canvas.blit_rect(
 			img,
@@ -247,6 +251,8 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 			# Expand little endian DWORD
 			var dword := (x4 << 24) | (x3 << 16) | (x2 << 8) | x1
 
+			assert(cel.bitmask_for_tile_id == 0x1fffffff, "Aseprite - Unsupported bitmask for tile id: 0x%X" % cel.bitmask_for_tile_id)
+
 			var tile_id := dword & cel.bitmask_for_tile_id
 			var x_flip := (dword & cel.bitmask_for_x_flip) != 0
 			var y_flip := (dword & cel.bitmask_for_y_flip) != 0
@@ -285,6 +291,19 @@ func get_tile_image(tileset_index: int, tile_id: int) -> Image:
 
 	var buffer_pos := tile_id * stride
 	var buf := tileset.buffer.slice(buffer_pos, buffer_pos + stride)
+
+	# TODO: Aseprite can save a layer with a tileset that does not match the tileset layer
+	# This happen when the user create a new tilemap, save the layer, then change the layer tilemap to another
+	# Aseprite will not update the cell data, only the tileset index
+	# resulting in an empty layer that contain tile ids that are out of bounds for the tileset
+	if buf.size() == 0:
+		# Return an empty image if the tile_id is out of bounds
+		return Image.create_empty(
+			tileset.tile_width,
+			tileset.tile_height,
+			false,
+			Image.FORMAT_RGBA8
+		)
 
 	return create_image_from_data(
 		tileset.tile_width,
@@ -947,17 +966,46 @@ enum TilesetFlags {
 
 ## 0x2023
 class Tileset extends Chunk:
+	## Tileset ID
 	var id: int = 0
-	var flags: TilesetFlags = 0
-	var tiles_count: int = 0
-	var tile_width: int = 0
-	var tile_height: int = 0
-	var base_index: int = 0
-	var name: String = ""
-	var external_file_id: int = -1
-	var external_id: int = -1
-	var buffer: PackedByteArray = []
 
+	## Tileset flags
+    ## [br] ● [b]1[/b] - Include link to external file
+    ## [br] ● [b]2[/b] - Include tiles inside this file
+    ## [br] ● [b]4[/b] - Tilemaps using this tileset use tile ID=0 as empty tile (this is the new format). In rare cases this bit is off, and the empty tile will be equal to 0xffffffff (used in internal versions of Aseprite)
+    ## [br] ● [b]8[/b] - Aseprite will try to match modified tiles with their X flipped version automatically in Auto mode when using this tileset.
+    ## [br] ● [b]16[/b] - Same for Y flips
+    ## [br] ● [b]32[/b] - Same for D(iagonal) flips
+	var flags: TilesetFlags = 0
+
+	## Number of tiles
+	var tiles_count: int = 0
+
+	## Tile Width in pixels
+	var tile_width: int = 0
+
+	## Tile Height in pixels
+	var tile_height: int = 0
+
+	## Base Index: Number to show in the screen from the tile with
+    ## index 1 and so on (by default this is field is 1, so the data
+    ## that is displayed is equivalent to the data in memory). But it
+    ## can be 0 to display zero-based indexing (this field isn't used
+    ## for the representation of the data in the file, it's just for
+    ## UI purposes).
+	var base_index: int = 0
+
+	## Name of the tileset
+	var name: String = ""
+
+	## ID of the external file. This ID is one entry of the the External Files Chunk.
+	var external_file_id: int = -1
+
+	## Tileset ID in the external file
+	var external_id: int = -1
+
+	## PIXEL[] Compressed Tileset image (see NOTE.3): (Tile Width) x (Tile Height x Number of Tiles)
+	var buffer: PackedByteArray = []
 
 ## 0x0004, 0x0011, 0x2016, 0x2017
 class UnsupportedChunk extends Chunk:

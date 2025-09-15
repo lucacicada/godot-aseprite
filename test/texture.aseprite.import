@@ -12,6 +12,7 @@ dest_files=["res://.godot/imported/texture.aseprite-268bddc8e5a0bc5c1250cf444f34
 
 [params]
 
-export/enabled=false
-export/path=""
-compress/mode=0
+save_to_file/enabled=false
+save_to_file/path=""
+import/only_visible_layers=true
+import/first_frame_only=true

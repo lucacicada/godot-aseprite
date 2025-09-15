@@ -14,7 +14,10 @@ func _get_preset_name(preset_index: int) -> String: return "Default"
 func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
 	# If path is empty, the user is editing the default project settings
 	if path.is_empty():
-		return true
+		# Hide all options related to saving to file
+		# these options make sense only when importing a specific file
+		if option_name.begins_with("save_to_file/"):
+			return false
 
 	if option_name == "save_to_file/path":
 		return options.get("save_to_file/enabled", false) == true
@@ -22,7 +25,7 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 	return true
 
 func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
-	return [
+	var options: Array[Dictionary] = [
 		{
 			"name": "save_to_file/enabled",
 			"default_value": false,
@@ -34,7 +37,18 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 			"property_hint": PROPERTY_HINT_SAVE_FILE,
 			"hint_string": "*.png",
 		},
+
+		{
+			"name": "import/only_visible_layers",
+			"default_value": true,
+		},
+		{
+			"name": "import/first_frame_only",
+			"default_value": true,
+		},
 	]
+
+	return options
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> int:
 	var err := OK
@@ -45,18 +59,23 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		push_error("Aseprite - Failed to open file: %s" % error_string(err))
 		return err
 
+	var import_only_visible_layers: bool = options.get("import/only_visible_layers", true) == true
+	var import_first_frame_only: bool = options.get("import/first_frame_only", true) == true
+
 	var canvas := Image.create_empty(ase.width, ase.height, false, Image.FORMAT_RGBA8)
 
 	for layer_index in range(ase.layers.size()):
 		var layer := ase.layers[layer_index]
 
+		# Skip fully transparent layers
 		if layer.opacity == 0:
 			continue
 
-		if not layer.is_visible():
+		# Skip group layers, they are empty
+		if layer.is_group_layer():
 			continue
 
-		if not layer.is_normal_layer():
+		if import_only_visible_layers and not layer.is_visible():
 			continue
 
 		var img := ase.get_layer_frame_image(layer_index, 0)

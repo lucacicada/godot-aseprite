@@ -14,7 +14,10 @@ func _get_preset_name(preset_index: int) -> String: return "Default"
 func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:
 	# If path is empty, the user is editing the default project settings
 	if path.is_empty():
-		return true
+		# Hide all options related to saving to file
+		# these options make sense only when importing a specific file
+		if option_name.begins_with("save_to_file/"):
+			return false
 
 	if option_name == "save_to_file/path":
 		return options.get("save_to_file/enabled", false) == true

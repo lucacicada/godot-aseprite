@@ -12,8 +12,8 @@ dest_files=["res://.godot/imported/tileset.aseprite-a47b28ec5dfa8d671be4563836a0
 
 [params]
 
-export/enabled=false
-export/path=""
+save_to_file/enabled=false
+save_to_file/path=""
 tile_set/tile_shape=0
 tile_set/tile_layout=0
 tile_set/tile_offset_axis=0

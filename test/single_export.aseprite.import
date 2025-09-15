@@ -12,6 +12,7 @@ dest_files=["res://.godot/imported/single_export.aseprite-0946e91be6cc5d8ae92ae2
 
 [params]
 
-export/enabled=true
-export/path=""
-compress/mode=0
+save_to_file/enabled=true
+save_to_file/path="uid://btjgw3rcxfx1y"
+import/only_visible_layers=true
+import/first_frame_only=true
