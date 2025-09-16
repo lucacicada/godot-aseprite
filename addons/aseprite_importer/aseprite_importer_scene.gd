@@ -40,13 +40,13 @@ func _get_import_options(path: String) -> void:
 	if not path.is_empty() and not path.get_extension().to_lower() in _get_extensions():
 		return
 
-	add_import_option_advanced(
-		TYPE_OBJECT,
-		"aseprite/nodes/root_script",
-		null,
-		PROPERTY_HINT_RESOURCE_TYPE,
-		"Script",
-	)
+	# add_import_option_advanced(
+	# 	TYPE_OBJECT,
+	# 	"aseprite/nodes/root_script",
+	# 	null,
+	# 	PROPERTY_HINT_RESOURCE_TYPE,
+	# 	"Script",
+	# )
 
 	add_import_option_advanced(
 		TYPE_INT,
