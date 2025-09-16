@@ -242,16 +242,16 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 		assert(cel.buffer.size() % (cel.bits_per_tile / 8) == 0, "Aseprite - Cel buffer size is not a multiple of %d: %d" % [(cel.bits_per_tile / 8), cel.buffer.size()])
 
 		# TODO: does godot support buffer-reader of some sort?
-		for i in range(cel.buffer.size() / 4):
-			var x1 := cel.buffer[i * 4 + 0]
-			var x2 := cel.buffer[i * 4 + 1]
-			var x3 := cel.buffer[i * 4 + 2]
-			var x4 := cel.buffer[i * 4 + 3]
+		for tile_index in range(cel.buffer.size() / 4):
+			var x1 := cel.buffer[tile_index * 4 + 0]
+			var x2 := cel.buffer[tile_index * 4 + 1]
+			var x3 := cel.buffer[tile_index * 4 + 2]
+			var x4 := cel.buffer[tile_index * 4 + 3]
 
 			# Expand little endian DWORD
 			var dword := (x4 << 24) | (x3 << 16) | (x2 << 8) | x1
 
-			assert(cel.bitmask_for_tile_id == 0x1fffffff, "Aseprite - Unsupported bitmask for tile id: 0x%X" % cel.bitmask_for_tile_id)
+			# assert(cel.bitmask_for_tile_id == 0x1fffffff, "Aseprite - Unsupported bitmask for tile id: 0x%X" % cel.bitmask_for_tile_id)
 
 			var tile_id := dword & cel.bitmask_for_tile_id
 			var x_flip := (dword & cel.bitmask_for_x_flip) != 0
@@ -260,15 +260,14 @@ func get_frame_cel_image(frame_index: int, cel_index: int) -> Image:
 
 			var img := get_tile_image(layer.tileset_index, tile_id)
 
-			# TODO: account for x_flip, y_flip and rotation!
-			# Only if the layer is a tilemap layer those bits are be 0!
+			# TODO: account for x_flip, y_flip and rotation
 			canvas.blit_rect(
 				img,
 				Rect2i(0, 0, img.get_width(), img.get_height()),
 				Vector2i(
 					# Cel is arranged like an image, it has a stride and height
-					(i % cel.w) * tileset.tile_width,
-					(i / cel.w) * tileset.tile_height
+					(tile_index % cel.w) * tileset.tile_width,
+					(tile_index / cel.w) * tileset.tile_height
 				),
 			)
 
@@ -297,6 +296,13 @@ func get_tile_image(tileset_index: int, tile_id: int) -> Image:
 	# Aseprite will not update the cell data, only the tileset index
 	# resulting in an empty layer that contain tile ids that are out of bounds for the tileset
 	if buf.size() == 0:
+		push_warning("Aseprite - Tile ID %d is out of bounds for tileset \"%s\" (Index %d) with %d tiles" % [
+			tile_id,
+			tileset.name,
+			tileset_index,
+			tileset.tiles_count,
+		])
+
 		# Return an empty image if the tile_id is out of bounds
 		return Image.create_empty(
 			tileset.tile_width,
