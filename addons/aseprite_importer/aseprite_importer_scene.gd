@@ -41,11 +41,11 @@ func _get_import_options(path: String) -> void:
 		return
 
 	add_import_option_advanced(
-		TYPE_STRING,
+		TYPE_OBJECT,
 		"aseprite/nodes/root_script",
-		"",
-		PROPERTY_HINT_FILE,
-		"*.gd",
+		null,
+		PROPERTY_HINT_RESOURCE_TYPE,
+		"Script",
 	)
 
 	add_import_option_advanced(
@@ -155,11 +155,17 @@ func _import_scene(path: String, _flags: int, options: Dictionary) -> Object:
 	var options_scene_root_type: String = options.get("nodes/root_type", "")
 
 	var root_script: Script = null
-	var root_script_path: String = options.get("nodes/root_script", "")
-	if not root_script_path.is_empty():
-		var script := ResourceLoader.load(root_script_path, "Script")
-		if script is Script:
-			root_script = script
+
+	var root_script_path := options.get("nodes/root_script")
+
+	if root_script_path is Script:
+		root_script = root_script_path
+
+	if root_script_path is String and not root_script_path.is_empty():
+		if ResourceLoader.exists(root_script_path, "Script"):
+			var script := ResourceLoader.load(root_script_path, "Script")
+			if script is Script:
+				root_script = script
 
 	# Validate the root node name
 	if options_scene_root_type.is_empty():
@@ -704,14 +710,50 @@ func _import_scene(path: String, _flags: int, options: Dictionary) -> Object:
 
 	return root_node
 
+# Resolve a script from a Variant that can be either a Script or a String path
+static func _resolve_script(value: Variant) -> Script:
+	if value is Script:
+		return value
+
+	if value is not String or value.is_empty():
+		return value
+
+	if not ResourceLoader.exists(value, "Script"):
+		return null
+
+	return ResourceLoader.load(value, "Script") as Script
+
+static func _resolve_path(value: Variant) -> String:
+	if value is not String or value.is_empty():
+		return ""
+
+	if value.begins_with("uid://"):
+		var uid := ResourceUID.text_to_id(value)
+
+		if uid == ResourceUID.INVALID_ID or not ResourceUID.has_id(uid):
+			return ""
+
+		value = ResourceUID.get_id_path(uid)
+
+	if not value.begins_with("res://") or value.contains("::"):
+		return ""
+
+	return value
+
 # Debug node, to render 2d-nodes in a viewport properly
 class ImporterRoot extends Node2D:
 	var size: Vector2
 	var anchor: Vector2
 
+	var _drag := false
+	var _start_drag_pos := Vector2.ZERO
+	var _position_offset := Vector2.ZERO
+
 	func _ready() -> void:
+		# Draw on top of everything else
 		z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 
+		# Set a background to cover the default 3d light
 		var canvas := CanvasLayer.new()
 		canvas.layer = -1
 		add_child(canvas)
@@ -722,6 +764,7 @@ class ImporterRoot extends Node2D:
 		color_rect.anchor_bottom = 1.0
 		color_rect.anchor_left = 0.0
 		color_rect.anchor_right = 1.0
+		color_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		canvas.add_child(color_rect)
 
 		# Correct the parten texture_filter
@@ -730,8 +773,6 @@ class ImporterRoot extends Node2D:
 			parent.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 	func _process(_delta: float) -> void:
-		queue_redraw()
-
 		if not is_inside_tree():
 			return
 
@@ -743,6 +784,30 @@ class ImporterRoot extends Node2D:
 		if viewport == null:
 			return
 
+		queue_redraw()
+
+		# Simulate dragging the scene around
+		if viewport.get_visible_rect().has_point(get_global_mouse_position()):
+			var is_dragging := Input.is_mouse_button_pressed(MouseButton.MOUSE_BUTTON_LEFT)
+
+			if not _drag and is_dragging:
+				_start_drag_pos = get_global_mouse_position()
+				_drag = true
+			elif _drag and not is_dragging:
+				_drag = false
+
+			if Input.is_mouse_button_pressed(MouseButton.MOUSE_BUTTON_RIGHT):
+				_drag = false
+				_position_offset = Vector2.ZERO
+
+		if not _drag:
+			# _position_offset = Vector2.ZERO
+			pass
+		else:
+			var current_pos = get_global_mouse_position()
+			_position_offset += current_pos - _start_drag_pos
+			_start_drag_pos = current_pos
+
 		var viewport_size := viewport.get_visible_rect().size
 
 		# Center and scale the parent node to fit in the viewport
@@ -751,6 +816,7 @@ class ImporterRoot extends Node2D:
 
 		var viewport_center := viewport_size / 2
 		parent.position = viewport_center - anchor * scale
+		parent.position += _position_offset
 
 	func _draw() -> void:
 		# draw the bounding box in thin gray

@@ -7,6 +7,12 @@ extends EditorScenePostImportPlugin
 func _get_internal_import_options(category: int) -> void:
 	if INTERNAL_IMPORT_CATEGORY_NODE == category:
 		add_import_option_advanced(
+			TYPE_BOOL,
+			"node/visible",
+			true,
+		)
+
+		add_import_option_advanced(
 			TYPE_STRING,
 			"node/name",
 			"",
@@ -17,13 +23,13 @@ func _get_internal_import_options(category: int) -> void:
 			false,
 		)
 
-		add_import_option_advanced(
-			TYPE_STRING,
-			"node/script",
-			"",
-			PROPERTY_HINT_FILE,
-			"*.gd",
-		)
+		# add_import_option_advanced(
+		# 	TYPE_OBJECT,
+		# 	"node/script",
+		# 	null,
+		# 	PROPERTY_HINT_RESOURCE_TYPE,
+		# 	"*.gd",
+		# )
 
 		# # Collision
 		# add_import_option_advanced(
