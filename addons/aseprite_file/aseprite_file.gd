@@ -296,13 +296,12 @@ func get_tile_image(tileset_index: int, tile_id: int) -> Image:
 	# Aseprite will not update the cell data, only the tileset index
 	# resulting in an empty layer that contain tile ids that are out of bounds for the tileset
 	if buf.size() == 0:
-		push_warning("Aseprite - Tile ID %d is out of bounds for tileset \"%s\" (Index %d) with %d tiles" % [
-			tile_id,
-			tileset.name,
-			tileset_index,
-			tileset.tiles_count,
-		])
-
+		# push_warning("Aseprite - Tile ID %d is out of bounds for tileset \"%s\" (Index %d) with %d tiles" % [
+		# 	tile_id,
+		# 	tileset.name,
+		# 	tileset_index,
+		# 	tileset.tiles_count,
+		# ])
 		# Return an empty image if the tile_id is out of bounds
 		return Image.create_empty(
 			tileset.tile_width,
