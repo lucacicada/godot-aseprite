@@ -4,6 +4,47 @@
 
 Aseprite file parser for Godot Engine.
 
+## Importer
+
+The plugin includes an importer.
+It support importing `.aseprite` files as scene files using the dedicated advanced importer found in Godot.
+
+<p align="center"><img src=".github/scene_importer.jpg" alt="Importer"/></p>
+
+The scene importer is pretty powerful, although incomplete, it allows to import sprites, animated sprites, collision shapes, light occlusion polygons, navigation polygons, Area2D with collision, custom attached script, etc.
+
+The importers have the ability to save to file the images as external resources.
+Saving the images as external resources is usefull for debugging, you want to re-use the image somewhere else, or manually choose the import options such as compression, mipmaps, etc.
+
+### Texture importer
+
+Import a `.aseprite` file as a texture.
+
+- [x] Save the texture to an external `.png` file.
+
+### Sprite frames importer
+
+Import a `.aseprite` file as a `SpriteFrames`.
+The importer will read the tags and create an animation for each tag.
+The animation duration is computed by averaging the duration of each frame in the tag.
+
+- [x] Save the texture to an external `.png` file.
+- [ ] Frame animation duration per frame is not implemented.
+- [ ] Linked cels are not supported.
+
+### Limitations
+
+The importer have some shortcomings:
+
+- Does not support layer opacity. _This one is a pretty big deal._
+- Does not support layer blend modes other than normal.
+- Does not fully support texture packing, it will generate a texture for each layer, animated sprites and tilemaps are sort of packed.
+- No texture trim, if the canvas is 100x100 and the sprite is 10x10, the texture will be 100x100 with a lot of transparent pixels.
+
+## AsepriteFile class
+
+Aseprite file parser for Godot Engine.
+
 ```gdscript
 var ase := AsepriteFile.open("res://path/to/file.aseprite")
 if ase == null:
@@ -44,43 +85,6 @@ Deprecated chunks are present in the spec but unused by Aseprite.
 
 - [ ] Mask Chunk (0x2016) DEPRECATED
 - [ ] Path Chunk (0x2017) Never used
-
-## Importer
-
-The plugin includes an importer.
-It support importing `.aseprite` files as scene files using the dedicated advanced importer found in Godot.
-
-<p align="center"><img src=".github/scene_importer.jpg" alt="Importer"/></p>
-
-The scene importer is pretty powerful, although incomplete, it allows to import sprites, animated sprites, collision shapes, light occlusion polygons, navigation polygons, Area2D with collision, custom attached script, etc.
-
-The importers have the ability to save to file the images as external resources.
-Saving the images as external resources is usefull for debugging, you want to re-use the image somewhere else, or manually choose the import options such as compression, mipmaps, etc.
-
-### Texture importer
-
-Import a `.aseprite` file as a texture.
-
-- [x] Save the texture to an external `.png` file.
-
-### Sprite frames importer
-
-Import a `.aseprite` file as a `SpriteFrames`.
-The importer will read the tags and create an animation for each tag.
-The animation duration is computed by averaging the duration of each frame in the tag.
-
-- [x] Save the texture to an external `.png` file.
-- [ ] Frame animation duration per frame is not implemented.
-- [ ] Linked cels are not supported.
-
-### Limitations
-
-The importer have some shortcomings:
-
-- Does not support layer opacity. _This one is a pretty big deal._
-- Does not support layer blend modes other than normal.
-- Does not fully support texture packing, it will generate a texture for each layer, animated sprites and tilemaps are sort of packed.
-- No texture trim, if the canvas is 100x100 and the sprite is 10x10, the texture will be 100x100 with a lot of transparent pixels.
 
 ## Security note
 
