@@ -691,7 +691,7 @@ func _import_scene(path: String, _flags: int, options: Dictionary) -> Object:
 	if root_node is Node2D:
 		var importer := ImporterRoot.new()
 		importer.name = "PreviewDebugNode"
-
+		importer.target_node = root_node
 		importer.size = Vector2(ase.width, ase.height)
 
 		match options_sprite_offset:
@@ -706,7 +706,10 @@ func _import_scene(path: String, _flags: int, options: Dictionary) -> Object:
 
 		importer.anchor += Vector2(0, options_y_sort_origin)
 
-		root_node.add_child(importer, true, Node.INTERNAL_MODE_BACK)
+		# Defer adding the node, to avoid issues with the editor
+		root_node.ready.connect(func() -> void:
+			root_node.add_child(importer, true, Node.INTERNAL_MODE_BACK)
+		)
 
 	return root_node
 
@@ -742,6 +745,7 @@ static func _resolve_path(value: Variant) -> String:
 
 # Debug node, to render 2d-nodes in a viewport properly
 class ImporterRoot extends Node2D:
+	var target_node: Node
 	var size: Vector2
 	var anchor: Vector2
 
@@ -750,6 +754,8 @@ class ImporterRoot extends Node2D:
 	var _position_offset := Vector2.ZERO
 
 	func _ready() -> void:
+		assert(target_node != null, "ImporterRoot requires a target_node to function")
+
 		# Draw on top of everything else
 		z_index = RenderingServer.CANVAS_ITEM_Z_MAX
 
@@ -768,16 +774,15 @@ class ImporterRoot extends Node2D:
 		canvas.add_child(color_rect)
 
 		# Correct the parten texture_filter
-		var parent := get_parent() as Node2D
-		if parent:
-			parent.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		if target_node is CanvasItem:
+			target_node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 	func _process(_delta: float) -> void:
 		if not is_inside_tree():
 			return
 
-		var parent := get_parent() as Node2D
-		if parent == null or not parent.is_inside_tree():
+		var parent := target_node as Node2D
+		if not is_instance_valid(parent) or not parent.is_inside_tree():
 			return
 
 		var viewport := parent.get_viewport()
