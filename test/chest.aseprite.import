@@ -44,7 +44,6 @@ _subresources={
 }
 }
 }
-aseprite/nodes/root_script=null
 aseprite/sprites/offset=2
 aseprite/sprites/y_sort_origin=0.0
 aseprite/collision/collision_layer=1
