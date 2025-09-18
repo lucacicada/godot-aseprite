@@ -128,6 +128,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		push_error("Aseprite - Failed to open file: %s" % error_string(err))
 		return err
 
+	print_rich("[color=#808080]Import begin[/color]")
+
 	var import_only_visible_layers: bool = options.get("import/only_visible_layers", true) == true
 	var import_first_frame_only: bool = options.get("import/first_frame_only", true) == true
 	var packing_type := int(options.get("packing/type", 0))
@@ -189,6 +191,15 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 				Rect2i(0, 0, img.get_width(), img.get_height()),
 				dst
 			)
+
+			print_rich("[color=#808080]Layer: \"%s\" #%d, Rect: { x: %s, y: %s, w: %s, h: %s }[/color]" % [
+				layer.name,
+				frame_index,
+				dst.x,
+				dst.y,
+				img.get_width(),
+				img.get_height(),
+			])
 
 	var texture = null
 
@@ -266,5 +277,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		texture.create_from_image(canvas, PortableCompressedTexture2D.COMPRESSION_MODE_LOSSLESS)
 
 	err = ResourceSaver.save(texture, save_path + "." + _get_save_extension())
+
+	print_rich("[color=#808080]Import end[/color]")
 
 	return err
