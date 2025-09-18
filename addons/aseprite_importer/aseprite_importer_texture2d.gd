@@ -1,6 +1,12 @@
 @tool
 extends EditorImportPlugin
 
+const PACKING_TYPE_HORIZONTAL_STRIP := 0
+const PACKING_TYPE_VERTICAL_STRIP := 1
+const PACKING_TYPE_BY_ROWS := 2
+const PACKING_TYPE_BY_COLUMNS := 3
+const PACKING_TYPE_PACKED := 4
+
 func _get_importer_name() -> String: return "aseprite.importer.texture2d"
 func _get_visible_name() -> String: return "Texture2D (Aseprite)"
 func _get_recognized_extensions() -> PackedStringArray: return ["aseprite"]
@@ -20,7 +26,21 @@ func _get_option_visibility(path: String, option_name: StringName, options: Dict
 			return false
 
 	if option_name == "save_to_file/path":
-		return options.get("save_to_file/enabled", false) == true
+		return options.get("save_to_file/enabled") == true
+
+	# Packing options have no effect when importing only the first frame
+	if option_name.begins_with("packing/") and options.get("import/first_frame_only") == true:
+		return false
+
+	if option_name == "packing/constraints/fixed_rows": return options.get("packing/type") == PACKING_TYPE_BY_COLUMNS
+	if option_name == "packing/constraints/fixed_columns": return options.get("packing/type") == PACKING_TYPE_BY_ROWS
+	if option_name == "packing/constraints/fixed_width": return options.get("packing/type") in [PACKING_TYPE_BY_ROWS, PACKING_TYPE_PACKED]
+	if option_name == "packing/constraints/fixed_height": return options.get("packing/type") in [PACKING_TYPE_BY_COLUMNS, PACKING_TYPE_PACKED]
+	if option_name == "packing/constraints/fixed_size": return options.get("packing/type") == PACKING_TYPE_PACKED
+
+	# When packed, always merge duplicates
+	if option_name == "packing/merge_duplicates":
+		return options.get("packing/type") != PACKING_TYPE_PACKED
 
 	return true
 
@@ -45,6 +65,55 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 		{
 			"name": "import/first_frame_only",
 			"default_value": true,
+			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
+		},
+
+		{
+			"name": "packing/merge_duplicates",
+			"default_value": false,
+		},
+		{
+			"name": "packing/ignore_empty",
+			"default_value": false,
+		},
+
+		{
+			"name": "packing/type",
+			"default_value": PACKING_TYPE_HORIZONTAL_STRIP,
+			"property_hint": PROPERTY_HINT_ENUM,
+			"hint_string": "Horizontal Strip,Vertical Strip,By Rows,By Columns,Packed",
+			"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_UPDATE_ALL_IF_MODIFIED
+		},
+
+		{
+			"name": "packing/constraints/fixed_rows",
+			"default_value": 0,
+			"property_hint": PROPERTY_HINT_RANGE,
+			"hint_string": "0,256,or_greater",
+		},
+		{
+			"name": "packing/constraints/fixed_columns",
+			"default_value": 0,
+			"property_hint": PROPERTY_HINT_RANGE,
+			"hint_string": "0,256,or_greater",
+		},
+
+		{
+			"name": "packing/constraints/fixed_width",
+			"default_value": 0,
+			"property_hint": PROPERTY_HINT_RANGE,
+			"hint_string": "0,2048,or_greater,suffix:px",
+		},
+		{
+			"name": "packing/constraints/fixed_height",
+			"default_value": 0,
+			"property_hint": PROPERTY_HINT_RANGE,
+			"hint_string": "0,2048,or_greater,suffix:px",
+		},
+		{
+			"name": "packing/constraints/fixed_size",
+			"default_value": Vector2i(0, 0),
+			"hint_string": "suffix:px",
 		},
 	]
 
@@ -61,25 +130,65 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	var import_only_visible_layers: bool = options.get("import/only_visible_layers", true) == true
 	var import_first_frame_only: bool = options.get("import/first_frame_only", true) == true
+	var packing_type := int(options.get("packing/type", 0))
 
-	var canvas := Image.create_empty(ase.width, ase.height, false, Image.FORMAT_RGBA8)
+	var frame_count := 1 if import_first_frame_only else ase.frames.size()
 
-	for layer_index in range(ase.layers.size()):
-		var layer := ase.layers[layer_index]
+	var canvas := Image.create_empty(
+		ase.width * (frame_count if packing_type == PACKING_TYPE_HORIZONTAL_STRIP else 1),
+		ase.height * (frame_count if packing_type == PACKING_TYPE_VERTICAL_STRIP else 1),
+		false,
+		Image.FORMAT_RGBA8
+	)
 
-		# Skip fully transparent layers
-		if layer.opacity == 0:
-			continue
+	for frame_index in range(frame_count):
+		# Duplicate as the array as it's used eslewhere plus it's readonly
+		var cels: Array[AsepriteFile.Cel] = ase.frames[frame_index].cels.duplicate()
 
-		# Skip group layers, they are empty
-		if layer.is_group_layer():
-			continue
+		cels.sort_custom(func(a: AsepriteFile.Cel, b: AsepriteFile.Cel):
+			var orderA := a.layer_index + a.z_index
+			var orderB := b.layer_index + b.z_index
+			return (orderA < orderB) || (orderA == orderB && a.z_index - b.z_index)
+		)
 
-		if import_only_visible_layers and not layer.is_visible():
-			continue
+		for idx in range(cels.size()):
+			var cel := cels[idx]
 
-		var img := ase.get_layer_frame_image(layer_index, 0)
-		canvas.blit_rect(img, Rect2i(Vector2i.ZERO, img.get_size()), Vector2i.ZERO)
+			# Grab the "real" cel index, "idx" is the index in the sorted array
+			# not the index in the frame cels array
+			var cel_index := ase.frames[frame_index].cels.find(cel)
+			var img := ase.get_frame_cel_image(frame_index, cel_index)
+
+			var layer := ase.layers[cel.layer_index]
+
+			# Adjust the opacity
+			for y in range(img.get_height()):
+				for x in range(img.get_width()):
+					var c := img.get_pixel(x, y)
+
+					# First apply the cel opacity
+					c.a *= cel.opacity / 255.0
+
+					# Then apply the layer opacity
+					c.a *= layer.opacity / 255.0
+
+					img.set_pixel(x, y, c)
+
+			var dst := Vector2i(cel.x, cel.y)
+
+			if packing_type == PACKING_TYPE_HORIZONTAL_STRIP:
+				# Horizontal strip
+				dst += Vector2i(frame_index * ase.width, 0)
+
+			elif packing_type == PACKING_TYPE_VERTICAL_STRIP:
+				# Vertical strip
+				dst += Vector2i(0, frame_index * ase.height)
+
+			canvas.blend_rect(
+				img,
+				Rect2i(0, 0, img.get_width(), img.get_height()),
+				dst
+			)
 
 	var texture = null
 

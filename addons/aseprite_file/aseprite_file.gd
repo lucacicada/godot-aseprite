@@ -184,12 +184,8 @@ func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
 	cels.sort_custom(func(a: AsepriteFile.Cel, b: AsepriteFile.Cel):
 		var orderA := a.layer_index + a.z_index
 		var orderB := b.layer_index + b.z_index
-		return orderA - orderB || a.z_index - b.z_index
+		return (orderA < orderB) || (orderA == orderB && a.z_index - b.z_index)
 	)
-
-	# Just print an empty image if there are no cels
-	# Use is_layer_frame_empty to check if the layer frame is empty
-	# if cels.size() == 0: return null
 
 	var canvas := Image.create_empty(
 		self.width,
@@ -206,7 +202,7 @@ func get_layer_frame_image(layer_index: int, frame_index: int) -> Image:
 		var cel := cels[index]
 		var img := get_frame_cel_image(frame_index, original_cel_index)
 
-		canvas.blit_rect(
+		canvas.blend_rect(
 			img,
 			Rect2i(0, 0, img.get_width(), img.get_height()),
 			Vector2i(cel.x, cel.y)
