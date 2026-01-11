@@ -132,7 +132,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		sprite_frames.set_animation_loop(animation_name, false if frames_count == 1 else tag.repeat == 0)
 		sprite_frames.set_animation_speed(animation_name, 1000.0 / (duration / frames_count))
 
-		for frame_index in frames_count:
+		for frame_index in range(tag.from_frame, tag.to_frame + 1):
 			var atlas_texture := AtlasTexture.new()
 			atlas_texture.atlas = atlas
 			atlas_texture.region = Rect2(ase.width * frame_index, 0, ase.width, ase.height)
